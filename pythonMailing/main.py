@@ -1,8 +1,8 @@
 import schedule
 import time
-import config
-from news_fetcher import fetch_latest_ai_news
-from email_sender import send_email
+import pythonMailing.config
+from pythonMailing.news_fetcher import fetch_latest_ai_news
+from pythonMailing.email_sender import send_email
 
 def job():
     print("\n--- Starting AI News Mailing Job ---")

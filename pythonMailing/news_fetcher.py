@@ -1,5 +1,5 @@
 import feedparser
-import config
+import pythonMailing.config
 from bs4 import BeautifulSoup
 from googletrans import Translator
 import time

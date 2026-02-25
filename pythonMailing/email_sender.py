@@ -1,7 +1,7 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import config
+import pythonMailing.config
 from datetime import datetime
 
 def format_news_html(news_items):
