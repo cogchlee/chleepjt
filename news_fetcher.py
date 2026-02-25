@@ -4,6 +4,9 @@ from bs4 import BeautifulSoup
 from googletrans import Translator
 import time
 import requests
+import re
+from googlenewsdecoder import new_decoderv1
+from newspaper import Article
 
 translator = Translator()
 
@@ -27,17 +30,49 @@ def clean_html_summary(html_content, max_sentences=4):
     """
     if not html_content:
         return ""
+    
+    # Try using BeautifulSoup
     soup = BeautifulSoup(html_content, "html.parser")
     text = soup.get_text(separator=' ').strip()
     
+    if len(text) < 20: 
+        return text
+
     # Split by common sentence terminators and take the first max_sentences
-    import re
-    sentences = re.split(r'(?<=[.!?]) +', text)
+    sentences = re.split(r'(?<=[.!?]) +', text.replace("\n", " "))
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return ""
+    
     limited_text = ' '.join(sentences[:max_sentences])
     if len(sentences) > max_sentences:
         limited_text += "..."
         
     return limited_text
+
+def extract_article_summary(url, fallback_html, max_sentences=4):
+    """
+    Attempts to decode the Google News URL and fetch the actual article text.
+    Uses Newspaper3k to parse the text. If it fails, falls back to the RSS html summary.
+    """
+    try:
+        decoded = new_decoderv1(url)
+        if hasattr(decoded, "get"):
+            real_url = decoded.get("decoded_url")
+        else:
+            real_url = decoded.get("decoded_url") if isinstance(decoded, dict) else url
+            
+        if real_url:
+            article = Article(real_url)
+            article.download()
+            article.parse()
+            if article.text and len(article.text) > 100:
+                return clean_html_summary(article.text, max_sentences)
+                
+    except Exception as e:
+        print(f"    -> Article extraction failed ({e}), falling back to RSS summary.")
+        
+    return clean_html_summary(fallback_html, max_sentences)
 
 def check_link_validity(url):
     """
@@ -53,13 +88,13 @@ def check_link_validity(url):
     except Exception:
         return False
 
-def fetch_latest_ai_news(limit=5):
+def fetch_latest_ai_news(limit=7):
     """
     Fetches the latest AI news from all configured RSS feeds.
     Verifies the link works before including it.
     
     Args:
-        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 5.
+        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 7.
         
     Returns:
         list of dict: A list containing dictionaries with bilingual titles and summaries.
@@ -90,7 +125,14 @@ def fetch_latest_ai_news(limit=5):
             published = entry.published
             
             summary_html = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
-            summary_en = clean_html_summary(summary_html)
+            
+            # Fetch the real article text for a proper summary
+            print(f"  Extracting summary for: {title_en[:30]}...")
+            summary_en = extract_article_summary(link, summary_html)
+            
+            # If still empty or just the title, ensure we at least have something
+            if not summary_en or len(summary_en) < 20:
+                summary_en = clean_html_summary(summary_html)
             
             # Translate to Korean
             print(f"  Translating: {title_en[:30]}...")
@@ -108,6 +150,9 @@ def fetch_latest_ai_news(limit=5):
                 "summary_ko": summary_ko
             })
             valid_items_for_topic += 1
+            
+            # Add a small delay between articles to avoid rate limiting
+            time.sleep(1)
         
     return news_items
 

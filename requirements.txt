@@ -4,3 +4,6 @@ schedule
 beautifulsoup4
 googletrans==4.0.0-rc1
 requests
+newspaper3k
+googlenewsdecoder
+lxml_html_clean
