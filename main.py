@@ -1,5 +1,6 @@
 import schedule
 import time
+import config
 from news_fetcher import fetch_latest_ai_news
 from email_sender import send_email
 
