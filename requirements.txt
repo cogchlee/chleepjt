@@ -3,3 +3,4 @@ python-dotenv
 schedule
 beautifulsoup4
 googletrans==4.0.0-rc1
+requests

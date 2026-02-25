@@ -3,6 +3,7 @@ import config
 from bs4 import BeautifulSoup
 from googletrans import Translator
 import time
+import requests
 
 translator = Translator()
 
@@ -19,7 +20,7 @@ def translate_to_korean(text):
         print(f"Translation error: {e}")
         return ""
 
-def clean_html_summary(html_content, max_sentences=3):
+def clean_html_summary(html_content, max_sentences=4):
     """
     Strips HTML tags to provide a clean text summary.
     Limits the output to a maximum of `max_sentences` sentences.
@@ -38,12 +39,27 @@ def clean_html_summary(html_content, max_sentences=3):
         
     return limited_text
 
-def fetch_latest_ai_news(limit=10):
+def check_link_validity(url):
+    """
+    Checks if a URL is reachable.
+    """
+    try:
+        # Use a timeout and a generic user-agent to avoid simple blocking
+        response = requests.head(url, timeout=5, allow_redirects=True, headers={'User-Agent': 'Mozilla/5.0'})
+        if response.status_code >= 400:
+            # Fallback to GET if HEAD isn't warmly accepted
+            response = requests.get(url, timeout=5, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
+        return response.status_code < 400
+    except Exception:
+        return False
+
+def fetch_latest_ai_news(limit=5):
     """
     Fetches the latest AI news from all configured RSS feeds.
+    Verifies the link works before including it.
     
     Args:
-        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 10.
+        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 5.
         
     Returns:
         list of dict: A list containing dictionaries with bilingual titles and summaries.
@@ -56,11 +72,21 @@ def fetch_latest_ai_news(limit=10):
         print(f"Fetching news for topic: {topic}")
         
         feed = feedparser.parse(url)
-        entries = feed.entries[:limit] if limit else feed.entries
         
-        for entry in entries:
+        valid_items_for_topic = 0
+        
+        for entry in feed.entries:
+            if valid_items_for_topic >= limit:
+                break
+                
             title_en = entry.title
             link = entry.link
+            
+            # Verify the link works
+            print(f"  Checking link: {link[:50]}...")
+            if not check_link_validity(link):
+                print("    -> Link broken or unreachable. Skipping.")
+                continue
             published = entry.published
             
             summary_html = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
@@ -81,6 +107,7 @@ def fetch_latest_ai_news(limit=10):
                 "summary_en": summary_en,
                 "summary_ko": summary_ko
             })
+            valid_items_for_topic += 1
         
     return news_items
 

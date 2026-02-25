@@ -21,12 +21,17 @@ def format_news_html(news_items):
           .topic-header {{ background-color: #f4f6f8; color: #2c3e50; padding: 12px 20px; margin: 30px 0 20px; border-left: 5px solid #2a5298; border-radius: 0 4px 4px 0; font-size: 20px; }}
           .news-item {{ margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #eee; }}
           .news-item:last-child {{ border-bottom: none; }}
-          .news-title-en {{ font-size: 18px; font-weight: 700; color: #1a0dab; margin-bottom: 5px; }}
-          .news-title-ko {{ font-size: 16px; font-weight: 600; color: #444; margin-bottom: 10px; }}
+          
+          .dual-title {{ margin-bottom: 12px; }}
+          .news-title-en {{ font-size: 18px; font-weight: 700; color: #1a0dab; margin-bottom: 4px; line-height: 1.3; }}
+          .news-title-ko {{ font-size: 16px; font-weight: 600; color: #444; margin-bottom: 0; line-height: 1.4; }}
+          
           .news-date {{ font-size: 12px; color: #999; margin-bottom: 15px; font-style: italic; }}
-          .news-summary {{ background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #eaeaea; font-size: 14px; color: #555; }}
-          .summary-en {{ margin-bottom: 10px; }}
-          .summary-ko {{ color: #444; border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px; }}
+          
+          .dual-summary {{ background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #eaeaea; font-size: 14px; color: #555; line-height: 1.5; }}
+          .summary-en {{ margin-bottom: 12px; }}
+          .summary-ko {{ color: #444; }}
+          
           .news-link {{ display: inline-block; margin-top: 15px; padding: 8px 15px; background-color: #2a5298; color: white !important; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: bold; transition: background-color 0.3s; }}
           .news-link:hover {{ background-color: #1e3c72; }}
         </style>
@@ -53,14 +58,16 @@ def format_news_html(news_items):
             for item in items:
                 html_content += f"""
                 <div class="news-item">
-                    <div class="news-title-en">{item['title_en']}</div>
-                    <div class="news-title-ko">{item['title_ko']}</div>
-                    <div class="news-date">Published: {item['published_date']}</div>
-                    <div class="news-summary">
-                        <div class="summary-en"><strong>Summary (EN):</strong><br>{item['summary_en']}</div>
-                        <div class="summary-ko"><strong>요약 (KO):</strong><br>{item['summary_ko']}</div>
+                    <div class="dual-title">
+                        <div class="news-title-en">{item['title_en']}</div>
+                        <div class="news-title-ko">{item['title_ko']}</div>
                     </div>
-                    <a class="news-link" href="{item['link']}" target="_blank">Read Full Article / 기사 본문 읽기</a>
+                    <div class="news-date">Published: {item['published_date']}</div>
+                    <div class="dual-summary">
+                        <div class="summary-en">{item['summary_en']}</div>
+                        <div class="summary-ko">{item['summary_ko']}</div>
+                    </div>
+                    <a class="news-link" href="{item['link']}" target="_blank">Read Full Article / Paper</a>
                 </div>
                 """
             
