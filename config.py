@@ -17,11 +17,11 @@ FORWARD_EMAIL = os.getenv("FORWARD_EMAIL", "")
 # We will use multiple Google News RSS feeds for specific topics.
 RSS_FEEDS = [
     {
-        "topic": "AI Agents, Assistants, and Tools",
+        "topic": "AI Agent, assistant, AI tool 관련 기사",
         "url": "https://news.google.com/rss/search?q=AI+%28Agent+OR+Assistant+OR+tools%29&hl=en-US&gl=US&ceid=US:en"
     },
     {
-        "topic": "Machine Learning, Image Processing, and Computer Vision",
+        "topic": "AI, Machine Learning, Image Processing, Computer Vision 관련 신규 기사 및 논문",
         "url": "https://news.google.com/rss/search?q=%28Machine+Learning+OR+Image+Processing+OR+Computer+Vision%29+AND+%28paper+OR+research+OR+article%29&hl=en-US&gl=US&ceid=US:en"
     }
 ]
