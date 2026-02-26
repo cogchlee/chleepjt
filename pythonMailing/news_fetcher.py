@@ -5,45 +5,12 @@ from googletrans import Translator
 import time
 import requests
 import re
-import json
-import os
 import logging
 from googlenewsdecoder import new_decoderv1
 from newspaper import Article
 
 logger = logging.getLogger(__name__)
 translator = Translator()
-
-SENT_LINKS_FILE = os.path.join(os.path.dirname(__file__), "sent_links.json")
-
-def get_sent_links():
-    """Retrieves previously sent links from the JSON file."""
-    if os.path.exists(SENT_LINKS_FILE):
-        try:
-            with open(SENT_LINKS_FILE, 'r', encoding='utf-8') as f:
-                links = set(json.load(f))
-                logger.debug(f"Loaded {len(links)} previously sent links.")
-                return links
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to load sent_links.json: {e}. Starting with empty set.")
-        except IOError as e:
-            logger.error(f"IO error reading sent_links.json: {e}")
-    return set()
-
-def save_sent_links(new_links):
-    """Saves newly sent links to the JSON file."""
-    if not new_links:
-        logger.debug("No new links to save.")
-        return
-        
-    try:
-        sent = get_sent_links()
-        sent.update(new_links)
-        with open(SENT_LINKS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(list(sent), f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved {len(new_links)} new links to sent_links.json.")
-    except IOError as e:
-        logger.error(f"Failed to save sent_links.json: {e}")
 
 def translate_to_korean(text):
     """
@@ -73,14 +40,12 @@ def clean_html_summary(html_content, max_sentences=4):
     if not html_content:
         return ""
     
-    # Try using BeautifulSoup
     soup = BeautifulSoup(html_content, "html.parser")
     text = soup.get_text(separator=' ').strip()
     
     if len(text) < 20: 
         return text
 
-    # Split by common sentence terminators and take the first max_sentences
     sentences = re.split(r'(?<=[.!?]) +', text.replace("\n", " "))
     sentences = [s.strip() for s in sentences if s.strip()]
     if not sentences:
@@ -126,11 +91,9 @@ def check_link_validity(url):
     Returns False if unreachable or timeout.
     """
     try:
-        # Use a timeout and a generic user-agent to avoid simple blocking
         response = requests.head(url, timeout=5, allow_redirects=True, 
                                headers={'User-Agent': 'Mozilla/5.0'})
         if response.status_code >= 400:
-            # Fallback to GET if HEAD isn't accepted
             response = requests.get(url, timeout=5, stream=True, 
                                   headers={'User-Agent': 'Mozilla/5.0'})
         return response.status_code < 400
@@ -144,20 +107,18 @@ def check_link_validity(url):
         logger.debug(f"Error checking link {url}: {type(e).__name__}")
         return False
 
-def fetch_latest_ai_news(limit=3):
+def fetch_latest_ai_news(limit=2):
     """
     Fetches the latest AI news from all configured RSS feeds.
     Verifies the link works before including it.
-    Filters out previously sent links.
     
     Args:
-        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 3.
+        limit (int, optional): The maximum number of news articles to return per topic. Defaults to 2.
         
     Returns:
         list of dict: A list containing dictionaries with bilingual titles and summaries.
     """
     news_items = []
-    sent_links = get_sent_links()
     
     for feed_info in config.RSS_FEEDS:
         topic = feed_info["topic"]
@@ -181,11 +142,6 @@ def fetch_latest_ai_news(limit=3):
                     title_en = entry.title
                     link = entry.link
                     
-                    # Check if already sent
-                    if link in sent_links:
-                        logger.debug(f"Link already sent: {link}")
-                        continue
-                    
                     # Verify the link works
                     logger.debug(f"Checking link validity: {link[:50]}...")
                     if not check_link_validity(link):
@@ -199,7 +155,6 @@ def fetch_latest_ai_news(limit=3):
                     logger.debug(f"Extracting summary for: {title_en[:30]}...")
                     summary_en = extract_article_summary(link, summary_html)
                     
-                    # If still empty or just the title, ensure we at least have something
                     if not summary_en or len(summary_en) < 20:
                         summary_en = clean_html_summary(summary_html)
                     
@@ -207,7 +162,7 @@ def fetch_latest_ai_news(limit=3):
                     logger.debug(f"Translating: {title_en[:30]}...")
                     title_ko = translate_to_korean(title_en)
                     summary_ko = translate_to_korean(summary_en)
-                    time.sleep(0.5) # Avoid hitting translation limits too fast
+                    time.sleep(0.5)
                     
                     news_items.append({
                         "topic": topic,
@@ -221,7 +176,6 @@ def fetch_latest_ai_news(limit=3):
                     valid_items_for_topic += 1
                     logger.info(f"Added article: {title_en[:50]}...")
                     
-                    # Add a small delay between articles to avoid rate limiting
                     time.sleep(1)
                     
                 except (AttributeError, KeyError) as e:
@@ -234,7 +188,6 @@ def fetch_latest_ai_news(limit=3):
     return news_items
 
 if __name__ == "__main__":
-    # Test the fetcher separately
     news = fetch_latest_ai_news(2)
     for index, item in enumerate(news, 1):
         print(f"[{item['topic']}] {item['title_en']}")
