@@ -98,6 +98,8 @@ def extract_article_summary(url, fallback_html, max_sentences=4):
     Uses Newspaper3k to parse the text. If it fails, falls back to the RSS html summary.
     """
     try:
+        # Give googlenewsdecoder a small break to avoid 429 Too Many Requests
+        time.sleep(1)
         decoded = new_decoderv1(url)
         if hasattr(decoded, "get"):
             real_url = decoded.get("decoded_url")
@@ -111,8 +113,10 @@ def extract_article_summary(url, fallback_html, max_sentences=4):
             if article.text and len(article.text) > 100:
                 return clean_html_summary(article.text, max_sentences)
                 
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"    -> Network error extracting article: {type(e).__name__}: {e}")
     except Exception as e:
-        print(f"    -> Article extraction failed ({e}), falling back to RSS summary.")
+        logger.warning(f"    -> Article extraction failed ({e}), falling back to RSS summary.")
         
     return clean_html_summary(fallback_html, max_sentences)
 
@@ -205,10 +209,6 @@ def fetch_latest_ai_news(limit=3):
                     summary_ko = translate_to_korean(summary_en)
                     time.sleep(0.5) # Avoid hitting translation limits too fast
                     
-                except (AttributeError, KeyError) as e:
-                    logger.warning(f"Error parsing feed entry: {e}")
-                    continue
-            
                     news_items.append({
                         "topic": topic,
                         "title_en": title_en,
@@ -223,6 +223,10 @@ def fetch_latest_ai_news(limit=3):
                     
                     # Add a small delay between articles to avoid rate limiting
                     time.sleep(1)
+                    
+                except (AttributeError, KeyError) as e:
+                    logger.warning(f"Error parsing feed entry: {e}")
+                    continue
         except AttributeError as e:
             logger.error(f"Error processing feed entries for {topic}: {e}")
         
