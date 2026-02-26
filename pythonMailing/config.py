@@ -1,7 +1,21 @@
 import os
+import logging
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
+
+# Configure logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("ai_news_mailing.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # SMTP Configuration
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -17,16 +31,51 @@ FORWARD_EMAIL = os.getenv("FORWARD_EMAIL", "")
 # We will use multiple Google News RSS feeds for specific topics.
 RSS_FEEDS = [
     {
-        "topic": "AI Agent, assistant, AI tool 관련 기사",
-        "url": "https://news.google.com/rss/search?q=AI+%28Agent+OR+Assistant+OR+tools%29&hl=en-US&gl=US&ceid=US:en"
+        "topic": "AI Agent, AI Tool, AI Assistant",
+        "url": "https://news.google.com/rss/search?q=AI+%28Agent+OR+Tool+OR+Assistant%29+AND+%28technology+OR+trend+OR+business+OR+academic+OR+research%29&hl=en-US&gl=US&ceid=US:en"
     },
     {
-        "topic": "AI, Machine Learning, Image Processing, Computer Vision 관련 신규 기사 및 논문",
-        "url": "https://news.google.com/rss/search?q=%28Machine+Learning+OR+Image+Processing+OR+Computer+Vision%29+AND+%28paper+OR+research+OR+article%29&hl=en-US&gl=US&ceid=US:en"
+        "topic": "Machine Learning Articles",
+        "url": "https://news.google.com/rss/search?q=%22Machine+Learning%22+AND+%28technology+OR+trend+OR+business+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+        "topic": "Image Processing, Computer Vision Articles",
+        "url": "https://news.google.com/rss/search?q=%28%22Image+Processing%22+OR+%22Computer+Vision%22%29+AND+%28technology+OR+trend+OR+business+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+        "topic": "AI, ML, CV, Image Processing Related Papers",
+        "url": "https://news.google.com/rss/search?q=%28AI+OR+%22Machine+Learning%22+OR+%22Computer+Vision%22+OR+%22Image+Processing%22%29+AND+%28paper+OR+research+OR+study+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
     }
 ]
 
 # Schedule Configuration
 # SCHEDULE_TYPE can be '10m' or 'twice_daily'
 SCHEDULE_TYPE = os.getenv("SCHEDULE_TYPE", "twice_daily")
+
+# Configuration Validation
+def validate_config():
+    """
+    Validates that all required configuration values are set.
+    Raises ValueError if critical configuration is missing.
+    """
+    required_fields = {
+        "SENDER_EMAIL": SENDER_EMAIL,
+        "SENDER_PASSWORD": SENDER_PASSWORD,
+        "RECEIVER_EMAIL": RECEIVER_EMAIL,
+    }
+    
+    missing_fields = [key for key, value in required_fields.items() if not value]
+    
+    if missing_fields:
+        error_msg = f"Missing required configuration: {', '.join(missing_fields)}. Please set these in your .env file."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    logger.info("Configuration validation passed.")
+
+# Validate config on import
+try:
+    validate_config()
+except ValueError as e:
+    logger.warning(f"Configuration validation warning: {e}")
 

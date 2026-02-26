@@ -1,8 +1,11 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import pythonMailing.config
+import config
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 def format_news_html(news_items):
     """
@@ -39,8 +42,8 @@ def format_news_html(news_items):
       <body>
         <div class="container">
             <div class="header">
-              <h2>Daily AI & ML News Update 📰</h2>
-              <p>{datetime.now().strftime("%B %d, %Y")}</p>
+              <h2>[Share]Daliy AI & ML News Auto Mailing</h2>
+              <p>{datetime.now().strftime("%Y년 %m월 %d일")}</p>
             </div>
             <div class="content">
     """
@@ -82,40 +85,54 @@ def format_news_html(news_items):
 def send_email(subject, news_items):
     """
     Formats the news and sends an email via SMTP.
+    Returns True if successful, False otherwise.
     """
     # Check if we have credentials
     if not config.SENDER_EMAIL or not config.SENDER_PASSWORD or not config.RECEIVER_EMAIL:
-        print("Error: Email credentials are not fully set in the .env file. Skipping email send.")
+        logger.error("Email credentials are not fully set in the .env file. Skipping email send.")
         return False
         
-    html_body = format_news_html(news_items)
-    
-    msg = MIMEMultipart()
-    msg['From'] = config.SENDER_EMAIL
-    
-    # Collect all recipients
-    recipients = [config.RECEIVER_EMAIL]
-    if config.FORWARD_EMAIL:
-        recipients.append(config.FORWARD_EMAIL)
-        
-    msg['To'] = ", ".join(recipients)
-    msg['Subject'] = subject
-    
-    msg.attach(MIMEText(html_body, 'html'))
+    if not news_items:
+        logger.warning("No news items to send.")
+        return False
     
     try:
-        print(f"Connecting to SMTP server {config.SMTP_SERVER}:{config.SMTP_PORT}...")
-        server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT)
+        html_body = format_news_html(news_items)
+        
+        msg = MIMEMultipart()
+        msg['From'] = config.SENDER_EMAIL
+        
+        # Collect all recipients
+        recipients = [config.RECEIVER_EMAIL]
+        if config.FORWARD_EMAIL:
+            recipients.append(config.FORWARD_EMAIL)
+    except Exception as e:
+        logger.error(f"Error preparing email: {e}")
+        return False
+        
+    try:
+        msg['To'] = ", ".join(recipients)
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        logger.info(f"Connecting to SMTP server {config.SMTP_SERVER}:{config.SMTP_PORT}...")
+        server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10)
         server.starttls()  # Secure the connection
         server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
         
-        print(f"Sending email to {', '.join(recipients)}...")
+        logger.info(f"Sending email to {', '.join(recipients)}...")
         server.send_message(msg)
         server.quit()
-        print("Email sent successfully!")
+        logger.info("Email sent successfully!")
         return True
+    except smtplib.SMTPAuthenticationError:
+        logger.error("SMTP authentication failed. Check SENDER_EMAIL and SENDER_PASSWORD.")
+        return False
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP error occurred: {e}")
+        return False
     except Exception as e:
-        print(f"Failed to send email. Error: {e}")
+        logger.error(f"Failed to send email. Error: {type(e).__name__}: {e}")
         return False
 
 if __name__ == "__main__":
