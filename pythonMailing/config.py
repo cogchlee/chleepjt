@@ -49,8 +49,11 @@ RSS_FEEDS = [
 ]
 
 # Schedule Configuration
-# SCHEDULE_TYPE can be '10m' or 'twice_daily'
-SCHEDULE_TYPE = os.getenv("SCHEDULE_TYPE", "twice_daily")
+# SCHEDULE_TYPE options:
+#   'Xm'          -> run every X minutes (e.g. '10m', '30m')
+#   'twice_daily' -> run at 08:00 AM and 04:00 PM KST
+#   'once_daily'  -> run at 08:00 AM KST only
+SCHEDULE_TYPE = os.getenv("SCHEDULE_TYPE", "once_daily")
 
 # Configuration Validation
 def validate_config():

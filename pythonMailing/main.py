@@ -15,13 +15,13 @@ def job():
     logger.info("="*50)
     
     try:
-        # 1. Fetch the latest news (2 per topic = 8 total)
+        # Fetch 2 articles per topic (4 topics = 8 total)
         news_items = fetch_latest_ai_news()
         
         if news_items:
             logger.info(f"Successfully fetched {len(news_items)} news articles.")
             
-            # 2. Build email subject with today's date
+            # Build email subject with today's KST date
             now = datetime.now()
             date_str = now.strftime("%Y년 %m월 %d일")
             subject = f"[Share]Daliy AI & ML News Auto Mailing {date_str}"
@@ -39,18 +39,49 @@ def job():
         logger.info("Job Finished")
         logger.info("="*50 + "\n")
 
+def setup_schedule(schedule_type: str):
+    """
+    Sets up the scheduler based on SCHEDULE_TYPE from .env:
+      - 'Xm'          : Run every X minutes  (e.g. '10m', '30m')
+      - 'twice_daily' : Run at 08:00 and 16:00 KST
+      - 'once_daily'  : Run at 08:00 KST only
+    Falls back to 'once_daily' if value is unrecognized.
+    """
+    if schedule_type.endswith('m'):
+        try:
+            minutes = int(schedule_type[:-1])
+            logger.info(f"Scheduling runs every {minutes} minutes.")
+            schedule.every(minutes).minutes.do(job)
+            return
+        except ValueError:
+            logger.warning(f"Invalid interval format '{schedule_type}'. Falling back to once_daily.")
+
+    if schedule_type == 'twice_daily':
+        logger.info("Scheduling runs at 08:00 AM and 04:00 PM KST.")
+        schedule.every().day.at("08:00").do(job)
+        schedule.every().day.at("16:00").do(job)
+    else:
+        # Default: once_daily at 08:00
+        if schedule_type != 'once_daily':
+            logger.warning(f"Unknown SCHEDULE_TYPE '{schedule_type}'. Defaulting to once_daily (08:00 KST).")
+        else:
+            logger.info("Scheduling one daily run at 08:00 AM KST.")
+        schedule.every().day.at("08:00").do(job)
+
 def main():
     """Main function that initializes and runs the scheduler."""
     logger.info("Welcome to the AI News Automated Mailing System.")
-    logger.info("Scheduling daily run at 08:00 AM KST.")
-    
+
+    schedule_type = config.SCHEDULE_TYPE
+    logger.info(f"SCHEDULE_TYPE = '{schedule_type}'")
+
     # Run immediately on startup
     logger.info("Executing immediate run...")
     job()
-    
-    # Schedule to run once every day at 08:00 AM
-    schedule.every().day.at("08:00").do(job)
-    
+
+    # Set up recurring schedule
+    setup_schedule(schedule_type)
+
     logger.info("Scheduler is running. Press Ctrl+C to exit.")
     try:
         while True:
