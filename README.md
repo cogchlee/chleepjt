@@ -18,7 +18,7 @@
 ## 📁 Repository Structure (저장소 구조)
 
 ```
-AntiGravityPjt_01/
+Project/
 ├── pythonMailing/          # 01. AI News Auto Mailing System
 │   ├── main.py             #   Entry point with scheduler (진입점 / 스케줄러)
 │   ├── config.py           #   Env vars & RSS feed settings (환경 변수 및 RSS 피드 설정)
@@ -49,6 +49,8 @@ python main.py
 
 ## 🛠 Tech Stack (기술 스택)
 
+### 01. Mailing System
+
 | Category (분류)         | Tools                                |
 | ----------------------- | ------------------------------------ |
 | Language (언어)         | Python 3.8+                          |
@@ -57,6 +59,10 @@ python main.py
 | Scheduling (스케줄링)   | `schedule` library                   |
 | Email (이메일)          | SMTP (Gmail)                         |
 | AI Agent Tool           | Google Gemini (Antigravity)          |
+
+### 02. — *(TBD)*
+
+### 03. — *(TBD)*
 
 ---
 
@@ -70,12 +76,3 @@ python main.py
   (각 폴더 내 `readme.md` 필수 작성)
 - Sensitive information is managed via `.env` files, excluded from Git.
   (민감 정보는 `.env` 파일로 관리하며 `.gitignore` 처리)
-
----
-
-## 📅 History (변경 이력)
-
-| Date (날짜) | Update (업데이트 내용)                                                        |
-| ----------- | ----------------------------------------------------------------------------- |
-| 2026-02-27  | Initial repository setup and README created (저장소 초기 구성 및 README 작성) |
-| 2026-02-27  | 01. AI News Mailing System initial implementation complete (초기 구현 완료)   |
