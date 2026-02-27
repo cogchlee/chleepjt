@@ -14,25 +14,46 @@ translator = Translator()
 
 KO_PATTERN = re.compile(r'[\uAC00-\uD7A3]')
 
+# --------------------------------------------------------------------------
+# Keywords used to score articles by technology/trend importance
+# --------------------------------------------------------------------------
+SCORE_KEYWORDS_EN = [
+    "technology", "trend", "innovation", "breakthrough", "research",
+    "development", "advance", "launch", "release", "analysis",
+    "insight", "state-of-the-art", "cutting-edge", "impact", "future"
+]
+SCORE_KEYWORDS_KO = [
+    "기술", "동향", "혁신", "연구", "개발", "출시", "도입", "분석",
+    "전망", "트렌드", "첨단", "미래", "성과", "논문", "활용"
+]
+
 def is_korean(text: str) -> bool:
-    """Returns True if text contains Korean characters."""
     return bool(KO_PATTERN.search(text or ""))
 
+def _score_article(title: str, summary: str) -> int:
+    """
+    Scores an article by counting technology/trend keywords in title + summary.
+    Title matches are weighted 3x, summary matches 1x.
+    """
+    combined = (title or "").lower()
+    summary_text = (summary or "").lower()
+
+    keywords = SCORE_KEYWORDS_KO if is_korean(title) else SCORE_KEYWORDS_EN
+
+    score = 0
+    for kw in keywords:
+        score += combined.count(kw) * 3
+        score += summary_text.count(kw)
+    return score
+
 def translate_text(text: str, src: str, dest: str) -> str:
-    """Generic translation helper. Returns empty string on failure."""
     if not text:
         return ""
     try:
         result = translator.translate(text, src=src, dest=dest)
         return result.text
-    except requests.exceptions.Timeout:
-        logger.warning(f"Translation timeout: {text[:50]}...")
-        return ""
-    except requests.exceptions.ConnectionError:
-        logger.warning("Translation connection error.")
-        return ""
     except Exception as e:
-        logger.error(f"Translation error: {type(e).__name__}: {e}")
+        logger.error(f"Translation error ({src}->{dest}): {type(e).__name__}: {e}")
         return ""
 
 def translate_to_korean(text: str) -> str:
@@ -42,91 +63,71 @@ def translate_to_english(text: str) -> str:
     return translate_text(text, src='ko', dest='en')
 
 def clean_html_summary(html_content, max_sentences=4):
-    """
-    Strips HTML tags to provide a clean text summary.
-    Limits the output to a maximum of `max_sentences` sentences.
-    """
     if not html_content:
         return ""
-    
     soup = BeautifulSoup(html_content, "html.parser")
     text = soup.get_text(separator=' ').strip()
-    
     if len(text) < 20:
         return text
-
     sentences = re.split(r'(?<=[.!?]) +', text.replace("\n", " "))
     sentences = [s.strip() for s in sentences if s.strip()]
     if not sentences:
         return ""
-    
-    limited_text = ' '.join(sentences[:max_sentences])
+    limited = ' '.join(sentences[:max_sentences])
     if len(sentences) > max_sentences:
-        limited_text += "..."
-        
-    return limited_text
+        limited += "..."
+    return limited
 
 def extract_article_summary(url, fallback_html, max_sentences=4):
-    """
-    Attempts to decode the Google News URL and fetch the actual article text.
-    Falls back to the RSS html summary on any error.
-    """
     try:
         time.sleep(1)
         decoded = new_decoderv1(url)
         real_url = decoded.get("decoded_url") if isinstance(decoded, dict) else url
-            
         if real_url:
             article = Article(real_url)
             article.download()
             article.parse()
             if article.text and len(article.text) > 100:
                 return clean_html_summary(article.text, max_sentences)
-                
     except requests.exceptions.RequestException as e:
-        logger.warning(f"    -> Network error extracting article: {type(e).__name__}: {e}")
+        logger.warning(f"    -> Network error: {type(e).__name__}: {e}")
     except Exception as e:
-        logger.warning(f"    -> Article extraction failed ({e}), falling back to RSS summary.")
-        
+        logger.warning(f"    -> Extraction failed ({e}), using RSS summary.")
     return clean_html_summary(fallback_html, max_sentences)
 
 def check_link_validity(url):
-    """
-    Checks if a URL is reachable. Returns False if unreachable or timeout.
-    """
     try:
         response = requests.head(url, timeout=5, allow_redirects=True,
-                               headers={'User-Agent': 'Mozilla/5.0'})
+                                 headers={'User-Agent': 'Mozilla/5.0'})
         if response.status_code >= 400:
             response = requests.get(url, timeout=5, stream=True,
-                                  headers={'User-Agent': 'Mozilla/5.0'})
+                                    headers={'User-Agent': 'Mozilla/5.0'})
         return response.status_code < 400
     except Exception as e:
-        logger.debug(f"Error checking link {url}: {type(e).__name__}")
+        logger.debug(f"Link check failed {url}: {type(e).__name__}")
         return False
 
-def _fetch_articles_from_feed(url: str, limit: int, topic: str) -> list:
+def _fetch_candidates(url: str, limit: int, topic: str) -> list:
     """
-    Internal helper: fetches up to `limit` valid articles from one RSS URL.
-    Automatically detects language and sets title_ko / title_en accordingly.
+    Fetch up to `limit` valid articles from one RSS feed.
+    Returns a list of raw article dicts (title, summary, link, published).
+    Does NOT translate yet – translation happens only on the winner.
     """
-    items = []
+    candidates = []
     try:
         feed = feedparser.parse(url)
     except Exception as e:
         logger.error(f"Failed to parse feed {url}: {e}")
-        return items
+        return candidates
 
     for entry in feed.entries:
-        if len(items) >= limit:
+        if len(candidates) >= limit:
             break
         try:
             title_raw = entry.title
             link = entry.link
 
-            logger.debug(f"Checking link: {link[:60]}...")
             if not check_link_validity(link):
-                logger.debug("Link unreachable – skipping.")
                 continue
 
             published = entry.get('published', 'N/A')
@@ -135,85 +136,116 @@ def _fetch_articles_from_feed(url: str, limit: int, topic: str) -> list:
             if not summary_raw or len(summary_raw) < 20:
                 summary_raw = clean_html_summary(summary_html)
 
-            # --- Language-aware bilingual handling ---
-            if is_korean(title_raw):
-                title_ko = title_raw
-                summary_ko = summary_raw
-                logger.debug(f"  [KO] Translating to EN: {title_ko[:30]}...")
-                title_en = translate_to_english(title_ko) or title_ko
-                summary_en = translate_to_english(summary_ko) if summary_ko else ""
-            else:
-                title_en = title_raw
-                summary_en = summary_raw
-                logger.debug(f"  [EN] Translating to KO: {title_en[:30]}...")
-                title_ko = translate_to_korean(title_en) or title_en
-                summary_ko = translate_to_korean(summary_en) if summary_en else ""
-
-            time.sleep(0.5)
-
-            items.append({
+            candidates.append({
                 "topic": topic,
-                "title_en": title_en,
-                "title_ko": title_ko,
+                "title_raw": title_raw,
+                "summary_raw": summary_raw,
                 "link": link,
                 "published_date": published,
-                "summary_en": summary_en,
-                "summary_ko": summary_ko
             })
-            logger.info(f"Added article: {title_ko[:50] if title_ko else title_en[:50]}...")
             time.sleep(1)
-
         except (AttributeError, KeyError) as e:
-            logger.warning(f"Error parsing entry: {e}")
+            logger.warning(f"Entry parse error: {e}")
             continue
 
-    return items
+    return candidates
 
-def fetch_latest_ai_news(limit=2):
+def _pick_best(candidates: list) -> dict | None:
     """
-    Fetches the latest AI news from all configured RSS feeds.
-    Korean articles are prioritised; if not enough Korean articles are found,
-    English articles are fetched as fallback.
+    Score all candidates and return the one with the highest
+    technology/trend importance score.
+    """
+    if not candidates:
+        return None
+    scored = sorted(
+        candidates,
+        key=lambda c: _score_article(c["title_raw"], c["summary_raw"]),
+        reverse=True
+    )
+    best = scored[0]
+    logger.info(f"  Best article (score={_score_article(best['title_raw'], best['summary_raw'])}): "
+                f"{best['title_raw'][:60]}...")
+    return best
 
-    Args:
-        limit (int): Max articles per topic. Defaults to 2.
+def _build_bilingual(candidate: dict) -> dict:
+    """
+    Translate the winning candidate into both languages and return
+    the final bilingual article dict.
+    """
+    title_raw   = candidate["title_raw"]
+    summary_raw = candidate["summary_raw"]
 
-    Returns:
-        list of dict with bilingual titles and summaries.
+    if is_korean(title_raw):
+        title_ko   = title_raw
+        summary_ko = summary_raw
+        logger.debug(f"  [KO->EN] Translating: {title_ko[:30]}...")
+        title_en   = translate_to_english(title_ko) or title_ko
+        summary_en = translate_to_english(summary_ko) if summary_ko else ""
+    else:
+        title_en   = title_raw
+        summary_en = summary_raw
+        logger.debug(f"  [EN->KO] Translating: {title_en[:30]}...")
+        title_ko   = translate_to_korean(title_en) or title_en
+        summary_ko = translate_to_korean(summary_en) if summary_en else ""
+
+    time.sleep(0.5)
+
+    return {
+        "topic":        candidate["topic"],
+        "title_en":     title_en,
+        "title_ko":     title_ko,
+        "link":         candidate["link"],
+        "published_date": candidate["published_date"],
+        "summary_en":   summary_en,
+        "summary_ko":   summary_ko,
+    }
+
+def fetch_latest_ai_news(candidate_pool: int = 10):
+    """
+    For each topic:
+      1. Fetch up to `candidate_pool` Korean articles from url_ko.
+      2. Fetch up to `candidate_pool` English articles from url_en.
+      3. Score each pool by technology/trend keyword importance.
+      4. Pick the TOP-1 Korean article and TOP-1 English article.
+      5. Translate only those two winners.
+
+    Result: 4 topics × (1 KO + 1 EN) = 8 articles total.
     """
     news_items = []
 
     for feed_info in config.RSS_FEEDS:
-        topic    = feed_info["topic"]
-        url_ko   = feed_info.get("url_ko", "")
-        url_en   = feed_info.get("url_en", feed_info.get("url", ""))
+        topic  = feed_info["topic"]
+        url_ko = feed_info.get("url_ko", "")
+        url_en = feed_info.get("url_en", feed_info.get("url", ""))
 
-        logger.info(f"Fetching (KO priority) for topic: {topic}")
+        logger.info(f"--- Topic: {topic} ---")
 
-        # 1. Try Korean feed first
-        ko_items = []
+        # ----- Korean pool → best 1 -----
         if url_ko:
-            ko_items = _fetch_articles_from_feed(url_ko, limit, topic)
-            logger.info(f"  {len(ko_items)} KO article(s) fetched.")
+            logger.info(f"  Fetching {candidate_pool} KO candidates...")
+            ko_candidates = _fetch_candidates(url_ko, candidate_pool, topic)
+            logger.info(f"  {len(ko_candidates)} KO candidates collected.")
+            best_ko = _pick_best(ko_candidates)
+            if best_ko:
+                news_items.append(_build_bilingual(best_ko))
 
-        # 2. Fill remaining slots with English feed
-        remaining = limit - len(ko_items)
-        en_items = []
-        if remaining > 0 and url_en:
-            logger.info(f"  Fetching {remaining} more from EN feed as fallback...")
-            en_items = _fetch_articles_from_feed(url_en, remaining, topic)
-            logger.info(f"  {len(en_items)} EN article(s) added.")
+        # ----- English pool → best 1 -----
+        if url_en:
+            logger.info(f"  Fetching {candidate_pool} EN candidates...")
+            en_candidates = _fetch_candidates(url_en, candidate_pool, topic)
+            logger.info(f"  {len(en_candidates)} EN candidates collected.")
+            best_en = _pick_best(en_candidates)
+            if best_en:
+                news_items.append(_build_bilingual(best_en))
 
-        news_items.extend(ko_items + en_items)
-
-    logger.info(f"Total news items fetched: {len(news_items)}")
+    logger.info(f"Total articles selected: {len(news_items)}")
     return news_items
 
 if __name__ == "__main__":
-    news = fetch_latest_ai_news(2)
+    news = fetch_latest_ai_news()
     for item in news:
-        print(f"[{item['topic']}]")
+        print(f"\n[{item['topic']}]")
         print(f"  KO: {item['title_ko']}")
         print(f"  EN: {item['title_en']}")
-        print(f"  Summary KO: {item['summary_ko'][:80]}...")
-        print(f"  Summary EN: {item['summary_en'][:80]}...\n")
+        print(f"  KO Summary: {item['summary_ko'][:80]}...")
+        print(f"  EN Summary: {item['summary_en'][:80]}...")
