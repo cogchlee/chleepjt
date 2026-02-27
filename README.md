@@ -25,6 +25,7 @@ Project/
 │   ├── news_fetcher.py     #   News fetching & importance ranking (뉴스 수집 및 중요도 랭킹)
 │   ├── email_sender.py     #   HTML email builder & sender (HTML 이메일 생성 및 발송)
 │   ├── requirements.txt    #   Python package list (Python 패키지 목록)
+│   ├── OC_guidance.md      #   Deployment & management guide (배포 및 관리 가이드)
 │   └── readme.md           #   Project detail docs (프로젝트 상세 설명)
 ├── README.md               # Repository overview (전체 저장소 소개 / 현재 파일)
 └── .gitignore
