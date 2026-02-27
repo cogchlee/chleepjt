@@ -42,7 +42,7 @@ def format_news_html(news_items):
       <body>
         <div class="container">
             <div class="header">
-              <h2>[Share]Daliy AI & ML News Auto Mailing</h2>
+              <h2>[Share]Daily AI & ML News Auto Mailing</h2>
               <p>{datetime.now().strftime("%Y년 %m월 %d일")}</p>
             </div>
             <div class="content">

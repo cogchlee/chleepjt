@@ -31,7 +31,7 @@ FORWARD_EMAIL         # (선택) 전달 주소
 
 # 선택 환경 변수
 LOG_LEVEL            # "DEBUG", "INFO", "WARNING", "ERROR" (기본값: INFO)
-SCHEDULE_TYPE        # "twice_daily" 또는 "10m" 등 (기본값: twice_daily)
+SCHEDULE_TYPE        # "once_daily", "twice_daily", "10m" 등 (기본값: once_daily)
 ```
 
 ### News Fetching (뉴스 수집)
@@ -45,7 +45,7 @@ SCHEDULE_TYPE        # "twice_daily" 또는 "10m" 등 (기본값: twice_daily)
   
 - ✅ 주제당 X개씩 추출 (설정 가능)
 - ✅ 제목, 링크, 발행일, 핵심 요약 추출
-- ✅ **중복 방지**: `sent_links.json`으로 이미 발송한 뉴스 추적
+- ✅ **중요도 랭킹**: 기술/동향 키워드 기반 스코어링으로 최우선 기사 선택
 - ✅ **URL 유효성 검사**: Timeout/Connection 에러 처리
 - ✅ **자동 번역**: 영문 → 한글 (Google Translate API)
 - ✅ **기사 전문 추출**: newspaper3k를 사용한 실제 콘텐츠 파싱
@@ -78,7 +78,7 @@ feedparser 예외 처리
 ### Main Orchestration (메인 오케스트레이션)
 #### `main.py`
 - 데이터 수집과 메일 발송을 통합하는 진입점
-- 스케줄링 기능 (APScheduler 기반)
+- 스케줄링 기능 (schedule 라이브러리 기반)
 - **상세한 로깅**: 작업 시작/완료 시간, 처리 결과 기록
 - **예외 처리**: 작업 실패 시 스택 트레이스 기록
 
@@ -109,7 +109,7 @@ RECEIVER_EMAIL=receiver@gmail.com
 FORWARD_EMAIL=optional_forwarding@example.com
 
 # 스케줄 타입
-SCHEDULE_TYPE=twice_daily  # 또는 "10m", "30m" 등
+SCHEDULE_TYPE=once_daily  # once_daily, twice_daily, 또는 "10m", "30m" 등
 
 # 로깅 레벨 (선택사항)
 LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
@@ -159,10 +159,10 @@ python main.py
 - 누락된 설정값 시 명확한 에러 메시지
 - import 시점에 검증 실행
 
-#### 4. **유닛 테스트 (Unit Tests)**
-- `test_news_fetcher.py`: 뉴스 수집 단위 테스트
-- `test_email_sender.py`: 이메일 발송 단위 테스트
-- Mock 객체를 사용한 독립적인 테스트
+#### 4. **한/영 이중 언어 지원**
+- 한국어 RSS 피드 우선 수집, 부족 시 영어 피드 보완
+- 기사 언어 자동 감지 후 양방향 번역 (KO↔EN)
+- 이메일에 영문/한글 제목 및 요약 동시 표시
 
 ---
 
@@ -173,12 +173,12 @@ python main.py
 
 ### 로그 레벨별 정보
 
-| 레벨 | 용도 | 예시 |
-|------|------|------|
-| DEBUG | 상세 디버깅 정보 | 링크 유효성 검사 결과 |
-| INFO | 일반 실행 정보 | 뉴스 수집 완료, 이메일 발송 성공 |
-| WARNING | 경고 메시지 | 설정값 누락, 번역 실패 |
-| ERROR | 에러 메시지 | 네트워크 오류, SMTP 실패 |
+| 레벨    | 용도             | 예시                             |
+| ------- | ---------------- | -------------------------------- |
+| DEBUG   | 상세 디버깅 정보 | 링크 유효성 검사 결과            |
+| INFO    | 일반 실행 정보   | 뉴스 수집 완료, 이메일 발송 성공 |
+| WARNING | 경고 메시지      | 설정값 누락, 번역 실패           |
+| ERROR   | 에러 메시지      | 네트워크 오류, SMTP 실패         |
 
 ### 로깅 레벨 변경
 ```bash
@@ -247,7 +247,7 @@ coverage html  # HTML 리포트 생성
 **해결방법:**
 - 인터넷 연결 확인
 - Google Translate API 접근성 확인
-- 로그에서 DetailError 메시지 확인
+- 로그에서 상세 에러 메시지 확인
 
 ### 4. 로그 파일이 없음
 
@@ -264,24 +264,24 @@ chmod 755 pythonMailing/
 
 ## 의존성 패키지 상세
 
-| 패키지 | 버전 | 용도 |
-|--------|------|------|
-| feedparser | 최신 | RSS 피드 파싱 |
-| python-dotenv | 최신 | 환경 변수 관리 |
-| schedule | 최신 | 작업 스케줄링 |
-| beautifulsoup4 | 최신 | HTML 파싱 |
-| googletrans | 4.0.0-rc1 | 자동 번역 |
-| requests | 최신 | HTTP 요청 |
-| newspaper3k | 최신 | 기사 콘텐츠 추출 |
-| googlenewsdecoder | 최신 | Google News URL 디코딩 |
-| lxml_html_clean | 최신 | HTML 정제 |
+| 패키지            | 버전      | 용도                   |
+| ----------------- | --------- | ---------------------- |
+| feedparser        | 최신      | RSS 피드 파싱          |
+| python-dotenv     | 최신      | 환경 변수 관리         |
+| schedule          | 최신      | 작업 스케줄링          |
+| beautifulsoup4    | 최신      | HTML 파싱              |
+| googletrans       | 4.0.0-rc1 | 자동 번역              |
+| requests          | 최신      | HTTP 요청              |
+| newspaper3k       | 최신      | 기사 콘텐츠 추출       |
+| googlenewsdecoder | 최신      | Google News URL 디코딩 |
+| lxml_html_clean   | 최신      | HTML 정제              |
 
 ---
 
 ## 버전 정보
 
 - **버전**: 2.0.0 (개선 완료)
-- **마지막 업데이트**: 2026-02-26
+- **마지막 업데이트**: 2026-02-27
 - **주요 변경사항**: 
   - Logging 통합
   - Error Handling 강화

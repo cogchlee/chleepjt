@@ -24,7 +24,7 @@ def job():
             # Build email subject with today's KST date
             now = datetime.now()
             date_str = now.strftime("%Y년 %m월 %d일")
-            subject = f"[Share]Daliy AI & ML News Auto Mailing {date_str}"
+            subject = f"[Share]Daily AI & ML News Auto Mailing {date_str}"
             
             if send_email(subject, news_items):
                 logger.info("Email sent successfully.")
