@@ -3,84 +3,92 @@ import time
 import logging
 from datetime import datetime
 import config
-from news_fetcher import fetch_latest_ai_news
+from news_fetcher import fetch_news_for_category
 from email_sender import send_email
 
 logger = logging.getLogger(__name__)
 
-def job():
-    """Main job function that fetches news and sends email."""
+def job_for_category(category):
+    """Job function that fetches news and sends email for a specific category."""
     logger.info("="*50)
-    logger.info("Starting AI News Mailing Job")
+    logger.info(f"Starting Job for Category: {category['name']}")
     logger.info("="*50)
     
     try:
-        # Fetch 2 articles per topic (4 topics = 8 total)
-        news_items = fetch_latest_ai_news()
+        # Fetch articles for this category
+        news_items = fetch_news_for_category(category)
         
         if news_items:
-            logger.info(f"Successfully fetched {len(news_items)} news articles.")
+            logger.info(f"Successfully fetched {len(news_items)} news articles for {category['name']}.")
             
             # Build email subject with today's KST date
             now = datetime.now()
             date_str = now.strftime("%Y년 %m월 %d일")
-            subject = f"[Share]Daily AI & ML News Auto Mailing {date_str}"
+            subject = f"{category['email_subject_prefix']} {date_str}"
             
-            if send_email(subject, news_items):
-                logger.info("Email sent successfully.")
+            if send_email(subject, news_items, category['credentials']):
+                logger.info(f"Email sent successfully for {category['name']}.")
             else:
-                logger.warning("Email sending failed.")
+                logger.warning(f"Email sending failed for {category['name']}.")
         else:
-            logger.warning("No articles found to send.")
+            logger.warning(f"No articles found to send for {category['name']}.")
+                
     except Exception as e:
-        logger.error(f"Job execution failed: {type(e).__name__}: {e}", exc_info=True)
+        logger.error(f"Job execution failed for {category['name']}: {type(e).__name__}: {e}", exc_info=True)
     finally:
-        logger.info("="*50)
-        logger.info("Job Finished")
-        logger.info("="*50 + "\n")
+        logger.info("-" * 40)
 
-def setup_schedule(schedule_type: str):
+def setup_schedule():
     """
-    Sets up the scheduler based on SCHEDULE_TYPE from .env:
+    Sets up the scheduler based on category schedules:
       - 'Xm'          : Run every X minutes  (e.g. '10m', '30m')
       - 'twice_daily' : Run at 08:00 and 16:00 KST
       - 'once_daily'  : Run at 08:00 KST only
     Falls back to 'once_daily' if value is unrecognized.
     """
-    if schedule_type.endswith('m'):
-        try:
-            minutes = int(schedule_type[:-1])
-            logger.info(f"Scheduling runs every {minutes} minutes.")
-            schedule.every(minutes).minutes.do(job)
-            return
-        except ValueError:
-            logger.warning(f"Invalid interval format '{schedule_type}'. Falling back to once_daily.")
+    active_cats = config.get_active_categories()
+    if not active_cats:
+        logger.warning("No active categories found with valid credentials. Nothing to schedule.")
+        return
 
-    if schedule_type == 'twice_daily':
-        logger.info("Scheduling runs at 08:00 AM and 04:00 PM KST.")
-        schedule.every().day.at("08:00").do(job)
-        schedule.every().day.at("16:00").do(job)
-    else:
-        # Default: once_daily at 08:00
-        if schedule_type != 'once_daily':
-            logger.warning(f"Unknown SCHEDULE_TYPE '{schedule_type}'. Defaulting to once_daily (08:00 KST).")
+    for category in active_cats:
+        schedule_type = category.get("schedule_type", "once_daily")
+        cat_name = category['name']
+        logger.info(f"Configuring schedule '{schedule_type}' for '{cat_name}'.")
+
+        if schedule_type.endswith('m'):
+            try:
+                minutes = int(schedule_type[:-1])
+                logger.info(f"Scheduling runs every {minutes} minutes for {cat_name}.")
+                schedule.every(minutes).minutes.do(job_for_category, category)
+                continue
+            except ValueError:
+                logger.warning(f"Invalid interval format '{schedule_type}' for {cat_name}. Falling back to once_daily.")
+                schedule_type = 'once_daily'
+
+        if schedule_type == 'twice_daily':
+            logger.info(f"Scheduling runs at 08:00 AM and 04:00 PM KST for {cat_name}.")
+            schedule.every().day.at("08:00").do(job_for_category, category)
+            schedule.every().day.at("16:00").do(job_for_category, category)
         else:
-            logger.info("Scheduling one daily run at 08:00 AM KST.")
-        schedule.every().day.at("08:00").do(job)
+            if schedule_type != 'once_daily':
+                logger.warning(f"Unknown SCHEDULE_TYPE '{schedule_type}' for {cat_name}. Defaulting to once_daily (08:00 KST).")
+            else:
+                logger.info(f"Scheduling one daily run at 08:00 AM KST for {cat_name}.")
+            schedule.every().day.at("08:00").do(job_for_category, category)
 
 def main():
     """Main function that initializes and runs the scheduler."""
     logger.info("Welcome to the AI News Automated Mailing System.")
 
-    schedule_type = config.SCHEDULE_TYPE
-    logger.info(f"SCHEDULE_TYPE = '{schedule_type}'")
-
-    # Run immediately on startup
+    # Run immediately on startup for all active
     logger.info("Executing immediate run...")
-    job()
+    for category in config.get_active_categories():
+        job_for_category(category)
+        time.sleep(5)
 
     # Set up recurring schedule
-    setup_schedule(schedule_type)
+    setup_schedule()
 
     logger.info("Scheduler is running. Press Ctrl+C to exit.")
     try:

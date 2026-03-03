@@ -6,6 +6,9 @@ import time
 import requests
 import re
 import logging
+import os
+import json
+from datetime import datetime
 from googlenewsdecoder import new_decoderv1
 from newspaper import Article
 
@@ -14,36 +17,48 @@ translator = Translator()
 
 KO_PATTERN = re.compile(r'[\uAC00-\uD7A3]')
 
-# --------------------------------------------------------------------------
-# Keywords used to score articles by technology/trend importance
-# --------------------------------------------------------------------------
-SCORE_KEYWORDS_EN = [
-    "technology", "trend", "innovation", "breakthrough", "research",
-    "development", "advance", "launch", "release", "analysis",
-    "insight", "state-of-the-art", "cutting-edge", "impact", "future"
-]
-SCORE_KEYWORDS_KO = [
-    "기술", "동향", "혁신", "연구", "개발", "출시", "도입", "분석",
-    "전망", "트렌드", "첨단", "미래", "성과", "논문", "활용"
-]
+def load_sent_links():
+    if not os.path.exists(config.SENT_LINKS_FILE):
+        return set(), ""
+    try:
+        with open(config.SENT_LINKS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        last_reset_date = data.get("date", "")
+        now = datetime.now()
+        today = now.strftime("%Y-%m-%d")
+        if now.weekday() == 6 and last_reset_date != today:
+            logger.info("Weekly reset: It's Sunday. Clearing sent links tracker.")
+            return set(), today
+        return set(data.get("links", [])), last_reset_date
+    except Exception as e:
+        logger.error(f"Failed to load sent links: {e}")
+        return set(), ""
+
+def save_sent_links(links_set, last_reset_date):
+    try:
+        data = {
+            "date": last_reset_date,
+            "links": list(links_set)
+        }
+        with open(config.SENT_LINKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.info(f"Saved {len(links_set)} cumulative sent links to tracker (Last reset: {last_reset_date}).")
+    except Exception as e:
+        logger.error(f"Failed to save sent links: {e}")
 
 def is_korean(text: str) -> bool:
     return bool(KO_PATTERN.search(text or ""))
 
-def _score_article(title: str, summary: str) -> int:
-    """
-    Scores an article by counting technology/trend keywords in title + summary.
-    Title matches are weighted 3x, summary matches 1x.
-    """
+def _score_article(title: str, summary: str, keywords_ko: list, keywords_en: list) -> int:
     combined = (title or "").lower()
     summary_text = (summary or "").lower()
 
-    keywords = SCORE_KEYWORDS_KO if is_korean(title) else SCORE_KEYWORDS_EN
+    keywords = keywords_ko if is_korean(title) else keywords_en
 
     score = 0
     for kw in keywords:
-        score += combined.count(kw) * 3
-        score += summary_text.count(kw)
+        score += combined.count(kw.lower()) * 3
+        score += summary_text.count(kw.lower())
     return score
 
 def translate_text(text: str, src: str, dest: str) -> str:
@@ -107,12 +122,7 @@ def check_link_validity(url):
         logger.debug(f"Link check failed {url}: {type(e).__name__}")
         return False
 
-def _fetch_candidates(url: str, limit: int, topic: str) -> list:
-    """
-    Fetch up to `limit` valid articles from one RSS feed.
-    Returns a list of raw article dicts (title, summary, link, published).
-    Does NOT translate yet – translation happens only on the winner.
-    """
+def _fetch_candidates(url: str, limit: int, topic: str, sent_links: set) -> list:
     candidates = []
     try:
         feed = feedparser.parse(url)
@@ -126,6 +136,9 @@ def _fetch_candidates(url: str, limit: int, topic: str) -> list:
         try:
             title_raw = entry.title
             link = entry.link
+
+            if link in sent_links:
+                continue
 
             if not check_link_validity(link):
                 continue
@@ -150,28 +163,20 @@ def _fetch_candidates(url: str, limit: int, topic: str) -> list:
 
     return candidates
 
-def _pick_best(candidates: list) -> dict | None:
-    """
-    Score all candidates and return the one with the highest
-    technology/trend importance score.
-    """
+def _pick_best(candidates: list, keywords_ko: list, keywords_en: list) -> dict | None:
     if not candidates:
         return None
     scored = sorted(
         candidates,
-        key=lambda c: _score_article(c["title_raw"], c["summary_raw"]),
+        key=lambda c: _score_article(c["title_raw"], c["summary_raw"], keywords_ko, keywords_en),
         reverse=True
     )
     best = scored[0]
-    logger.info(f"  Best article (score={_score_article(best['title_raw'], best['summary_raw'])}): "
-                f"{best['title_raw'][:60]}...")
+    best_score = _score_article(best['title_raw'], best['summary_raw'], keywords_ko, keywords_en)
+    logger.info(f"  Best article (score={best_score}): {best['title_raw'][:60]}...")
     return best
 
 def _build_bilingual(candidate: dict) -> dict:
-    """
-    Translate the winning candidate into both languages and return
-    the final bilingual article dict.
-    """
     title_raw   = candidate["title_raw"]
     summary_raw = candidate["summary_raw"]
 
@@ -200,52 +205,43 @@ def _build_bilingual(candidate: dict) -> dict:
         "summary_ko":   summary_ko,
     }
 
-def fetch_latest_ai_news(candidate_pool: int = 10):
-    """
-    For each topic:
-      1. Fetch up to `candidate_pool` Korean articles from url_ko.
-      2. Fetch up to `candidate_pool` English articles from url_en.
-      3. Score each pool by technology/trend keyword importance.
-      4. Pick the TOP-1 Korean article and TOP-1 English article.
-      5. Translate only those two winners.
-
-    Result: 4 topics × (1 KO + 1 EN) = 8 articles total.
-    """
+def fetch_news_for_category(category_config: dict, candidate_pool: int = 10):
     news_items = []
+    sent_links, last_reset_date = load_sent_links()
+    
+    current_iteration_links = set()
+    
+    keywords_en = category_config.get("keywords_en", [])
+    keywords_ko = category_config.get("keywords_ko", [])
 
-    for feed_info in config.RSS_FEEDS:
+    for feed_info in category_config.get("feeds", []):
         topic  = feed_info["topic"]
         url_ko = feed_info.get("url_ko", "")
         url_en = feed_info.get("url_en", feed_info.get("url", ""))
 
         logger.info(f"--- Topic: {topic} ---")
 
-        # ----- Korean pool → best 1 -----
         if url_ko:
-            logger.info(f"  Fetching {candidate_pool} KO candidates...")
-            ko_candidates = _fetch_candidates(url_ko, candidate_pool, topic)
+            logger.info(f"  Fetching {candidate_pool} KO candidates (skipping duplicates)...")
+            ko_candidates = _fetch_candidates(url_ko, candidate_pool, topic, sent_links.union(current_iteration_links))
             logger.info(f"  {len(ko_candidates)} KO candidates collected.")
-            best_ko = _pick_best(ko_candidates)
+            best_ko = _pick_best(ko_candidates, keywords_ko, keywords_en)
             if best_ko:
                 news_items.append(_build_bilingual(best_ko))
+                current_iteration_links.add(best_ko["link"])
 
-        # ----- English pool → best 1 -----
         if url_en:
-            logger.info(f"  Fetching {candidate_pool} EN candidates...")
-            en_candidates = _fetch_candidates(url_en, candidate_pool, topic)
+            logger.info(f"  Fetching {candidate_pool} EN candidates (skipping duplicates)...")
+            en_candidates = _fetch_candidates(url_en, candidate_pool, topic, sent_links.union(current_iteration_links))
             logger.info(f"  {len(en_candidates)} EN candidates collected.")
-            best_en = _pick_best(en_candidates)
+            best_en = _pick_best(en_candidates, keywords_ko, keywords_en)
             if best_en:
                 news_items.append(_build_bilingual(best_en))
+                current_iteration_links.add(best_en["link"])
 
-    logger.info(f"Total articles selected: {len(news_items)}")
+    if news_items:
+        sent_links.update(current_iteration_links)
+        save_sent_links(sent_links, last_reset_date)
+
+    logger.info(f"Total articles selected for {category_config.get('name')}: {len(news_items)}")
     return news_items
-
-if __name__ == "__main__":
-    news = fetch_latest_ai_news()
-    for item in news:
-        print(f"\n[{item['topic']}]")
-        print(f"  KO: {item['title_ko']}")
-        print(f"  EN: {item['title_en']}")
-        print(f"  KO Summary: {item['summary_ko'][:80]}...")
-        print(f"  EN Summary: {item['summary_en'][:80]}...")
