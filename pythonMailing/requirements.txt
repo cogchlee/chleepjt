@@ -1,0 +1,18 @@
+# Core news fetching
+feedparser
+requests
+newspaper3k
+lxml
+lxml_html_clean
+googlenewsdecoder
+beautifulsoup4
+
+# Translation
+googletrans==4.0.0-rc1
+
+# Scheduling & environment
+schedule
+python-dotenv
+pytz
+
+# Email (stdlib, no install needed: smtplib, email)

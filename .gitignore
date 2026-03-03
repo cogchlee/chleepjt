@@ -1,27 +1,3 @@
-# Environment variables (contains API keys - never commit!)
 .env
-
-# Python cache
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-
-# IDE settings
-.idea/
-.vscode/
-*.iml
-
-# Virtual environments
-venv/
-env/
-.venv/
-
-# Logs
-*.log
-logs/
-
-# OS
-.DS_Store
-Thumbs.db
