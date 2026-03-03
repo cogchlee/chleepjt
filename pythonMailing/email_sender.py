@@ -15,28 +15,27 @@ def format_news_html(news_items):
     <html>
       <head>
         <style>
-          body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #e0e0e0; background-color: #121212; padding: 20px; }}
-          .container {{ max-width: 800px; margin: 0 auto; background-color: #1e1e1e; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }}
-          .header {{ background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%); color: #ffffff; padding: 30px 20px; text-align: center; border-bottom: 2px solid #415a77; }}
-          .header h2 {{ margin: 0; font-size: 24px; letter-spacing: 1px; color: #e0e4cc; }}
-          .header p {{ margin: 10px 0 0; font-size: 14px; color: #a0a0a0; }}
-          .content {{ padding: 20px 30px; }}
-          .topic-header {{ background-color: #2c3e50; color: #ecf0f1; padding: 12px 20px; margin: 30px 0 20px; border-left: 5px solid #3498db; border-radius: 0 4px 4px 0; font-size: 20px; }}
-          .news-item {{ margin-bottom: 25px; padding-bottom: 25px; border-bottom: 1px solid #333333; }}
-          .news-item:last-child {{ border-bottom: none; }}
+          body {{ font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #F9FAFB; background-color: #0B0D0F; padding: 20px; margin: 0; }}
+          .container {{ max-width: 800px; margin: 0 auto; background-color: #191F28; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
+          .header {{ padding: 40px 30px; text-align: center; border-bottom: 1px solid #333D4B; background-color: #191F28; }}
+          .header h2 {{ margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #F9FAFB; }}
+          .header p {{ margin: 12px 0 0; font-size: 15px; color: #8B95A1; }}
+          .content {{ padding: 20px 30px 40px; }}
+          .topic-header {{ color: #3182F6; padding: 20px 0 10px; margin: 20px 0 10px; border-bottom: 2px solid #333D4B; font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }}
+          .news-item {{ background-color: #222831; border-radius: 16px; padding: 24px; margin-bottom: 20px; }}
           
-          .dual-title {{ margin-bottom: 12px; }}
-          .news-title-en {{ font-size: 18px; font-weight: 700; color: #6db3f2; margin-bottom: 4px; line-height: 1.3; }}
-          .news-title-ko {{ font-size: 16px; font-weight: 600; color: #d0d0d0; margin-bottom: 0; line-height: 1.4; }}
+          .dual-title {{ margin-bottom: 14px; }}
+          .news-title-en {{ font-size: 18px; font-weight: 700; color: #F9FAFB; margin-bottom: 8px; line-height: 1.4; letter-spacing: -0.3px; word-break: keep-all; }}
+          .news-title-ko {{ font-size: 16px; font-weight: 600; color: #B0B8C1; margin-bottom: 0; line-height: 1.5; letter-spacing: -0.3px; word-break: keep-all; }}
           
-          .news-date {{ font-size: 12px; color: #888888; margin-bottom: 15px; font-style: italic; }}
+          .news-date {{ font-size: 13px; color: #8B95A1; margin-bottom: 16px; font-weight: 500; display: inline-block; background-color: #333D4B; padding: 4px 8px; border-radius: 6px; }}
           
-          .dual-summary {{ background-color: #252525; padding: 15px; border-radius: 6px; border: 1px solid #333333; font-size: 14px; color: #cccccc; line-height: 1.5; }}
-          .summary-en {{ margin-bottom: 12px; }}
-          .summary-ko {{ color: #cccccc; border-top: 1px dashed #555555; padding-top: 10px; margin-top: 10px; }}
+          .dual-summary {{ background-color: #191F28; padding: 18px; border-radius: 12px; font-size: 15px; color: #D1D6DB; line-height: 1.6; letter-spacing: -0.2px; }}
+          .summary-en {{ margin-bottom: 16px; word-break: keep-all; }}
+          .summary-ko {{ color: #8B95A1; border-top: 1px solid #333D4B; padding-top: 16px; word-break: keep-all; }}
           
-          .news-link {{ display: inline-block; margin-top: 15px; padding: 8px 15px; background-color: #3498db; color: #ffffff !important; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: bold; transition: background-color 0.3s; }}
-          .news-link:hover {{ background-color: #2980b9; }}
+          .button-container {{ margin-top: 24px; text-align: right; }}
+          .news-link {{ display: inline-block; padding: 12px 24px; background-color: #3182F6; color: #ffffff !important; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }}
         </style>
       </head>
       <body>
@@ -49,7 +48,7 @@ def format_news_html(news_items):
     """
     
     if not news_items:
-        html_content += "<p style='text-align:center;'>No news found for today.</p>"
+        html_content += "<p style='text-align:center; color: #8B95A1; padding: 40px;'>No news found for today.</p>"
     else:
         # Group items by topic
         grouped_news = {}
@@ -70,7 +69,9 @@ def format_news_html(news_items):
                         <div class="summary-en">{item['summary_en']}</div>
                         <div class="summary-ko">{item['summary_ko']}</div>
                     </div>
-                    <a class="news-link" href="{item['link']}" target="_blank">Read Full Article / Paper</a>
+                    <div class="button-container">
+                        <a class="news-link" href="{item['link']}" target="_blank">Read Full Article</a>
+                    </div>
                 </div>
                 """
             
@@ -82,14 +83,19 @@ def format_news_html(news_items):
     """
     return html_content
 
-def send_email(subject, news_items):
+def send_email(subject, news_items, credentials):
     """
     Formats the news and sends an email via SMTP.
     Returns True if successful, False otherwise.
     """
+    sender_email = credentials.get("SENDER_EMAIL")
+    sender_password = credentials.get("SENDER_PASSWORD")
+    receiver_email = credentials.get("RECEIVER_EMAIL")
+    forward_email = credentials.get("FORWARD_EMAIL")
+    
     # Check if we have credentials
-    if not config.SENDER_EMAIL or not config.SENDER_PASSWORD or not config.RECEIVER_EMAIL:
-        logger.error("Email credentials are not fully set in the .env file. Skipping email send.")
+    if not sender_email or not sender_password or not receiver_email:
+        logger.error("Email credentials are not fully set for this category. Skipping email send.")
         return False
         
     if not news_items:
@@ -97,15 +103,15 @@ def send_email(subject, news_items):
         return False
     
     try:
-        html_body = format_news_html(news_items)
+        html_body = format_news_html(news_items, subject)
         
         msg = MIMEMultipart()
-        msg['From'] = config.SENDER_EMAIL
+        msg['From'] = sender_email
         
         # Collect all recipients
-        recipients = [config.RECEIVER_EMAIL]
-        if config.FORWARD_EMAIL:
-            recipients.append(config.FORWARD_EMAIL)
+        recipients = [receiver_email]
+        if forward_email and str(forward_email).strip().upper() != "NONE":
+            recipients.append(forward_email.strip())
     except Exception as e:
         logger.error(f"Error preparing email: {e}")
         return False
@@ -118,7 +124,7 @@ def send_email(subject, news_items):
         logger.info(f"Connecting to SMTP server {config.SMTP_SERVER}:{config.SMTP_PORT}...")
         server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10)
         server.starttls()  # Secure the connection
-        server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
+        server.login(sender_email, sender_password)
         
         logger.info(f"Sending email to {', '.join(recipients)}...")
         server.send_message(msg)
@@ -138,6 +144,6 @@ def send_email(subject, news_items):
 if __name__ == "__main__":
     # Test formatting only
     test_news = [
-        {"title": "Test AI Breakthrough", "link": "https://example.com", "published_date": "Today"}
+        {"title_en": "Test English Title", "title_ko": "테스트 한글 제목", "link": "https://example.com", "published_date": "Today", "topic": "Test Topic", "summary_en": "English summary...", "summary_ko": "한글 요약..."}
     ]
-    print(format_news_html(test_news))
+    print(format_news_html(test_news, "[Share] Test Category News"))
