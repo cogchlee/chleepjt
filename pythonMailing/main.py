@@ -26,7 +26,7 @@ def job_for_category(category):
             date_str = now.strftime("%Y년 %m월 %d일")
             subject = f"{category['email_subject_prefix']} {date_str}"
             
-            if send_email(subject, news_items, category['credentials']):
+            if send_email(subject, news_items, category['credentials'], header_title=category['email_subject_prefix']):
                 logger.info(f"Email sent successfully for {category['name']}.")
             else:
                 logger.warning(f"Email sending failed for {category['name']}.")

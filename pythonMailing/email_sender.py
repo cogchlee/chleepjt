@@ -7,7 +7,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-def format_news_html(news_items, subject_title):
+def format_news_html(news_items, header_title):
     """
     Formats the list of news dictionaries into an HTML string, grouped by topic.
     """
@@ -41,7 +41,7 @@ def format_news_html(news_items, subject_title):
       <body>
         <div class="container">
             <div class="header">
-              <h2>{subject_title}</h2>
+              <h2>{header_title}</h2>
               <p>{datetime.now().strftime("%Y년 %m월 %d일")}</p>
             </div>
             <div class="content">
@@ -83,7 +83,7 @@ def format_news_html(news_items, subject_title):
     """
     return html_content
 
-def send_email(subject, news_items, credentials):
+def send_email(subject, news_items, credentials, header_title=None):
     """
     Formats the news and sends an email via SMTP.
     Returns True if successful, False otherwise.
@@ -103,7 +103,7 @@ def send_email(subject, news_items, credentials):
         return False
     
     try:
-        html_body = format_news_html(news_items, subject)
+        html_body = format_news_html(news_items, header_title or subject)
         
         msg = MIMEMultipart()
         msg['From'] = sender_email
