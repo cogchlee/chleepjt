@@ -7,11 +7,11 @@
 
 ## 📋 Project Lists
 
-| No. | Project                            | Language / Stack | Status           | Description                                                                                           |
-| --- | ---------------------------------- | ---------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| 01  | [Mailing System](./pythonMailing/) | Python           | ✅ Active         | AI & ML News Auto Collection and Email Delivery System (AI & ML 뉴스 자동 수집 및 이메일 발송 시스템) |
-| 02  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                     |
-| 03  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                     |
+| No. | Project                            | Language / Stack | Status           | Description                                                                                                                          |
+| --- | ---------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 01  | [Mailing System](./pythonMailing/) | Python           | ✅ Active         | AI, ML, Education & Literacy News Auto Collection and Auth Mailing System (AI, ML, 교육/문해력 뉴스 자동 수집 및 이메일 발송 시스템) |
+| 02  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                                                    |
+| 03  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                                                    |
 
 ---
 

@@ -1,6 +1,6 @@
 # AI News Automated Mailing System / 자동화된 AI 뉴스 메일링 시스템
 
-이 시스템은 AI 에이전트, 어시스턴트, 머신러닝, 컴퓨터 비전 관련 최신 뉴스와 논문을 자동으로 수집하여 정해진 스케줄에 맞춰 이메일로 발송합니다.
+이 시스템은 AI 에이전트, 머신러닝, 컴퓨터 비전 관련 뉴스뿐만 아니라, **유아 교육 및 문해력(Education & Literacy)** 등 다중 카테고리 기사를 자동으로 수집하여 정해진 독립적인 스케줄에 맞춰 이메일로 발송합니다.
 
 ---
 
@@ -23,33 +23,35 @@
 - **로깅 설정**: `LOG_LEVEL` 환경 변수로 로깅 레벨 조절 가능
 
 ```python
-# 필수 환경 변수
+# 필수 환경 변수 (카테고리 1: AI & ML)
 SENDER_EMAIL          # 발송자 이메일
 SENDER_PASSWORD       # 발송자 비밀번호
 RECEIVER_EMAIL        # 수신자 이메일
-FORWARD_EMAIL         # (선택) 전달 주소
+FORWARD_EMAIL         # (선택) 전달 주소 ("NONE" 입력 시 전달 생략)
 
-# 선택 환경 변수
-LOG_LEVEL            # "DEBUG", "INFO", "WARNING", "ERROR" (기본값: INFO)
-SCHEDULE_TYPE        # "once_daily", "twice_daily", "10m" 등 (기본값: once_daily)
+# 선택 환경 변수 (카테고리 2: Education & Literacy)
+CAT2_SENDER_EMAIL     # 미입력 시 SENDER_EMAIL 로 폴백
+CAT2_SENDER_PASSWORD  # 미입력 시 SENDER_PASSWORD 로 폴백 
+CAT2_RECEIVER_EMAIL   # 미입력 시 RECEIVER_EMAIL 로 폴백
+CAT2_FORWARD_EMAIL    # 미입력 시 FORWARD_EMAIL 로 폴백
+
+# 스케줄 설정
+SCHEDULE_TYPE         # Category 1 실행 스케줄 (기본값: once_daily)
+CAT2_SCHEDULE_TYPE    # Category 2 실행 스케줄 (기본값: once_daily)
+LOG_LEVEL             # "DEBUG", "INFO", "WARNING", "ERROR" (기본값: INFO)
 ```
 
 ### News Fetching (뉴스 수집)
 #### `news_fetcher.py`
 **주요 기능:**
-- ✅ 4가지 주제의 Google News RSS 피드에서 뉴스 추출
-  - AI Agent, AI Tool, AI Assistant
-  - Machine Learning Articles
-  - Image Processing, Computer Vision Articles
-  - AI, ML, CV 관련 Research Papers
-  
-- ✅ 주제당 X개씩 추출 (설정 가능)
-- ✅ 제목, 링크, 발행일, 핵심 요약 추출
-- ✅ **중요도 랭킹**: 기술/동향 키워드 기반 스코어링으로 최우선 기사 선택
-- ✅ **URL 유효성 검사**: Timeout/Connection 에러 처리
+- ✅ **다중 카테고리 지원**: AI & ML (4개 토픽) 및 Education & Literacy (2개 토픽) 독립 수집
+- ✅ 주제당 최대 풀에서 최상위 중요도 기사 추출
+- ✅ 제목, 링크, 발행일, 핵심 요약 데이터 수집
+- ✅ **중요도 랭킹**: 카테고리별 맞춤 키워드(기술/동향, 교육/문해력) 기반 스코어링
+- ✅ **연속적인 필터링**: 중복 기사 발송 방지를 위한 `sent_links.json` 기반 **주간(일요일) 초기화** 적용
+- ✅ **URL 유효성 검사**: HTTPS Connection, 403 Forbidden 시 RSS 요약본으로 대체
 - ✅ **자동 번역**: 영문 → 한글 (Google Translate API)
-- ✅ **기사 전문 추출**: newspaper3k를 사용한 실제 콘텐츠 파싱
-- ✅ **강화된 에러 처리**: 네트워크 에러, 타임아웃, 파싱 오류 등
+- ✅ **강화된 에러 처리**: 크롤링 차단 시 깔끔한 Fallback 메커니즘 제공
 
 **개선된 에러 처리:**
 ```python
@@ -68,12 +70,11 @@ feedparser 예외 처리
 
 ### Email Sending (이메일 발송)
 #### `email_sender.py`
-- 추출된 뉴스를 깔끔한 HTML 형식으로 포맷팅
-- 다크 테마 적용 (전문적인 외관)
-- 주제별로 그룹화된 뉴스 표시
-- 영문 / 한글 이중 제목 및 요약
-- 수신자 및 선택적 전달 주소로 발송
-- **강화된 SMTP 예외 처리**: 인증 실패, SMTP 에러 상세 로깅
+- 추출된 뉴스를 깔끔한 **Toss 스타일 다크 모드 HTML** 형식으로 포맷팅
+- 모서리가 둥근 세련된 UI, 시그니처 블루 액센트 적용
+- 영문 / 한글 이중 제목 및 요약 (본문 제목과 날짜 분리 UI)
+- 수신자 및 전달 주소(`FORWARD_EMAIL`)로 발송 (단, "NONE"으로 설정 시 Forward 거부)
+- **강화된 SMTP 예외 처리**: 인증 실패 시 로깅 보강
 
 ### Main Orchestration (메인 오케스트레이션)
 #### `main.py`
@@ -118,7 +119,7 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
 **Gmail App Password 생성 방법:**
 1. Google 계정의 보안 설정 접속
 2. "앱 비밀번호" 활성화
-3. 생성된 16자리 비밀번호를 SENDER_PASSWORD에 입력
+3. 생성된 16자리 비밀번호를 `SENDER_PASSWORD` (및 필요 시 `CAT2_SENDER_PASSWORD`)에 입력
 
 ### 4️⃣ 실행
 ```bash
@@ -162,7 +163,14 @@ python main.py
 #### 4. **한/영 이중 언어 지원**
 - 한국어 RSS 피드 우선 수집, 부족 시 영어 피드 보완
 - 기사 언어 자동 감지 후 양방향 번역 (KO↔EN)
-- 이메일에 영문/한글 제목 및 요약 동시 표시
+
+#### 5. **고도화된 다중 카테고리 파이프라인**
+- 하나의 Python 스크립트로 여러 개의 뉴스 카테고리 관리 가능
+- 카테고리별 독립적인 이메일 발송자/수신자 및 스케줄링 간격(`CAT2_SCHEDULE_TYPE`) 지정
+
+#### 6. **효율적인 기사 중복 방지 (Deduplication)**
+- 이미 발송된 URL은 `sent_links.json`에 저장하여 중복 발송 차단
+- 트래커는 매주 일요일 자정에 자동 초기화됨
 
 ---
 
