@@ -7,7 +7,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-def format_news_html(news_items):
+def format_news_html(news_items, subject_title):
     """
     Formats the list of news dictionaries into an HTML string, grouped by topic.
     """
@@ -41,7 +41,7 @@ def format_news_html(news_items):
       <body>
         <div class="container">
             <div class="header">
-              <h2>[Share]Daily AI & ML News Auto Mailing</h2>
+              <h2>{subject_title}</h2>
               <p>{datetime.now().strftime("%Y년 %m월 %d일")}</p>
             </div>
             <div class="content">
