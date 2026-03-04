@@ -7,11 +7,11 @@
 
 ## 📋 Project Lists
 
-| No. | Project                            | Language / Stack | Status           | Description                                                                                                                          |
-| --- | ---------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 01  | [Mailing System](./pythonMailing/) | Python           | ✅ Active         | AI, ML, Education & Literacy News Auto Collection and Auth Mailing System (AI, ML, 교육/문해력 뉴스 자동 수집 및 이메일 발송 시스템) |
-| 02  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                                                    |
-| 03  | —                                  | —                | 🔜 Planned (예정) | —                                                                                                                                    |
+| No. | Project                               | Language / Stack | Status           | Description                                                                                                                          |
+| --- | ------------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 01  | [Mailing System](./pythonMailing/)    | Python           | ✅ Active         | AI, ML, Education & Literacy News Auto Collection and Auth Mailing System (AI, ML, 교육/문해력 뉴스 자동 수집 및 이메일 발송 시스템) |
+| 02  | [Upbit Auto Trading](./tradeProject/) | Python           | ✅ Active         | Upbit API Auto Trading Bot with Simulation Mode (업비트 가상자산 자동매매 및 모의투자 봇)                                            |
+| 03  | —                                     | —                | 🔜 Planned (예정) | —                                                                                                                                    |
 
 ---
 
@@ -27,6 +27,11 @@ Project/
 │   ├── requirements.txt    #   Python package list (Python 패키지 목록)
 │   ├── OC_guidance.md      #   Deployment & management guide (배포 및 관리 가이드)
 │   └── readme.md           #   Project detail docs (프로젝트 상세 설명)
+├── tradeProject/           # 02. Upbit Auto Trading System
+│   ├── main.py             #   Trading bot main loop (자동매매 봇 메인 루프)
+│   ├── test_simulate.py    #   Simulation logic test script (모의투자 테스트 스크립트)
+│   ├── .env.example        #   Environment variables template (환경변수 템플릿)
+│   └── README.md           #   Project detail docs (프로젝트 상세 설명)
 ├── README.md               # Repository overview (전체 저장소 소개 / 현재 파일)
 └── .gitignore
 ```
@@ -46,6 +51,14 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### 02. Upbit Trading Bot
+```bash
+cd tradeProject
+pip install pyupbit python-dotenv
+# Set up .env file before running (실행 전 .env 파일 확인)
+python main.py
+```
+
 ---
 
 ## 🛠 Tech Stack (기술 스택)
@@ -61,7 +74,14 @@ python main.py
 | Email (이메일)          | SMTP (Gmail)                         |
 | AI Agent Tool           | Google Gemini (Antigravity)          |
 
-### 02. — *(TBD)*
+### 02. Upbit Trading Bot
+
+| Category (분류)       | Tools                                |
+| --------------------- | ------------------------------------ |
+| Language (언어)       | Python 3.8+                          |
+| Exchange API (거래소) | Upbit Open API (`pyupbit`)           |
+| Strategy (전략)       | Volatility Breakout + Moving Average |
+| Configuration (설정)  | `python-dotenv`                      |
 
 ### 03. — *(TBD)*
 
