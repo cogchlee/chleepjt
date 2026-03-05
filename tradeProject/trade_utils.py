@@ -13,6 +13,7 @@ import time
 import logging
 import requests
 import pandas as pd
+from typing import Optional
 
 try:
     import pyupbit
@@ -75,7 +76,7 @@ def get_current_prices_bulk(tickers: list) -> dict:
         return {}
 
 
-def get_ohlcv_safe(ticker: str, count: int) -> pd.DataFrame | None:
+def get_ohlcv_safe(ticker: str, count: int) -> Optional[pd.DataFrame]:
     """
     Safely fetch daily OHLCV data for a ticker.
     Returns None if unavailable.
