@@ -1,106 +1,272 @@
+"""
+main.py
+=======
+Upbit Auto Trading Bot – Main Entry Point
+
+Features:
+  - Runs 24/7. Only stops on Ctrl+C (SIGINT) or SIGTERM.
+  - On forced shutdown, prints a full trade summary & final asset value.
+  - Initial parameter optimisation on startup.
+  - Automatic re-optimisation every 24 h using the latest 14-day OHLCV data.
+  - Top-100 KRW tickers by 24h trading volume, refreshed on each re-train cycle.
+  - Simulation mode (default) uses 10,000 KRW as starting capital.
+"""
+
 import os
 import time
+import signal
 import logging
+import datetime
 from dotenv import load_dotenv
 
 try:
     import pyupbit
 except ImportError:
-    logging.warning("pyupbit not installed. Please `pip install pyupbit`")
     pyupbit = None
 
-# Load environment variables (e.g., from .env file)
+from trade_utils import (
+    get_top_volume_tickers,
+    get_current_prices_bulk,
+    get_ohlcv_safe,
+    build_ticker_params,
+)
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - [%(levelname)s] %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - [%(levelname)s] %(message)s",
+)
 
-# ==========================================
-# 1. Configuration & Global Variables
-# ==========================================
-ACCESS_KEY = os.environ.get("UPBIT_ACCESS_KEY", "")
-SECRET_KEY = os.environ.get("UPBIT_SECRET_KEY", "")
+ACCESS_KEY        = os.environ.get("UPBIT_ACCESS_KEY", "")
+SECRET_KEY        = os.environ.get("UPBIT_SECRET_KEY", "")
+SIMULATION_MODE   = os.environ.get("SIMULATION_MODE", "True").lower() in ("true", "1", "yes")
 
-# Determine mode: Simulation or Real
-SIMULATION_MODE = os.environ.get("SIMULATION_MODE", "True").lower() in ["true", "1", "yes"]
+SIM_START_KRW     = 10_000.0    # Simulation starting balance (KRW)
+TICKER_LIMIT      = 100         # Number of tickers to trade
+TRAIN_DAYS        = 14          # OHLCV look-back window for optimisation
+RETRAIN_HOURS     = 24          # Re-optimise every N hours
+BUY_RATIO         = 0.10        # Allocate 10 % of remaining KRW per buy
+MIN_BUY_KRW       = 500         # Minimum order size (KRW)
+TAKE_PROFIT_RATIO = 0.05        # +5 % → sell
+STOP_LOSS_RATIO   = -0.03       # −3 % → sell
+FEE_RATE          = 0.0005      # Upbit trading fee: 0.05 % per leg
 
-# Default Tickers
-# KRW-BTC (Bitcoin), KRW-ETH (Ethereum), KRW-XRP (Ripple), KRW-SOL (Solana), KRW-DOGE (Dogecoin)
-TICKERS = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-SOL", "KRW-DOGE"]
+# ---------------------------------------------------------------------------
+# Global State (mutated by signal handler)
+# ---------------------------------------------------------------------------
+_shutdown_requested = False
 
-# ==========================================
-# 2. Helper Functions for Data Fetching
-# ==========================================
-def get_top_volume_tickers(limit=5):
-    """
-    Fetch top tickers by 24h trading volume in KRW market.
-    If pyupbit is not available or an error occurs, returns default TICKERS.
-    """
-    if not pyupbit: return TICKERS[:limit]
-    try:
-        krw_tickers = pyupbit.get_tickers(fiat="KRW")
-        # To get actual top volume accurately, one would need to fetch all tickers' data.
-        # This can be heavy, so we will just return the most popular ones for now
-        # as a placeholder for top volume logic.
-        return krw_tickers[:limit]
-    except Exception as e:
-        logging.error(f"Error fetching top tickers: {e}")
-        return TICKERS[:limit]
+# Simulation ledger
+sim_krw       : float = SIM_START_KRW
+sim_holdings  : dict  = {}  # { ticker: units }
+sim_buy_prices: dict  = {}  # { ticker: buy_price }
 
-def get_current_prices_bulk(tickers):
-    """
-    Fetch current prices for a list of tickers at once.
-    Returns a dictionary: { 'KRW-BTC': 100000000, ... }
-    """
-    if not pyupbit: 
-        # Dummy data for testing if no pyupbit
-        return {t: 100000000 for t in tickers}
-    try:
-        return pyupbit.get_current_price(tickers)
-    except Exception as e:
-        logging.error(f"Error fetching bulk prices: {e}")
-        return {}
+# Trade history for final report
+trade_log: list = []  # list of dicts
 
-def get_target_price(ticker, k=0.5):
-    """
-    Calculate the target buy price (Volatility Breakout Strategy).
-    Range = Previous High - Previous Low
-    Target = Today Open + Range * K
-    """
-    if not pyupbit: return 100000000
-    try:
-        df = pyupbit.get_ohlcv(ticker, interval="day", count=2)
-        if df is not None and len(df) >= 2:
-            prev_day = df.iloc[0]
-            today_open = df.iloc[1]['open']
-            target = today_open + (prev_day['high'] - prev_day['low']) * k
-            return target
-    except Exception as e:
-        logging.error(f"Error calculating target price for {ticker}: {e}")
-    return 0
 
-def get_ma(ticker, days=5):
-    """
-    Calculate the Moving Average for the given days.
-    """
-    if not pyupbit: return 90000000
-    try:
-        df = pyupbit.get_ohlcv(ticker, interval="day", count=days)
-        if df is not None and len(df) >= days:
-            return df['close'].mean()
-    except Exception as e:
-        logging.error(f"Error calculating MA{days} for {ticker}: {e}")
-    return 0
+# ---------------------------------------------------------------------------
+# Signal Handler
+# ---------------------------------------------------------------------------
+def _request_shutdown(signum, frame):
+    global _shutdown_requested
+    logging.info("Shutdown signal received. Finishing current cycle...")
+    _shutdown_requested = True
 
-# ==========================================
-# 3. Main Logic & Loop
-# ==========================================
+
+signal.signal(signal.SIGINT,  _request_shutdown)
+signal.signal(signal.SIGTERM, _request_shutdown)
+
+
+# ---------------------------------------------------------------------------
+# Trade Helpers
+# ---------------------------------------------------------------------------
+
+def _execute_buy(ticker: str, current_price: float, upbit=None):
+    """Execute a buy order (simulation or real)."""
+    global sim_krw
+
+    if SIMULATION_MODE:
+        buy_amount = min(sim_krw * BUY_RATIO, sim_krw)
+        if buy_amount < MIN_BUY_KRW:
+            return
+        units = (buy_amount * (1 - FEE_RATE)) / current_price
+        sim_krw             -= buy_amount
+        sim_holdings[ticker] = sim_holdings.get(ticker, 0) + units
+        sim_buy_prices[ticker] = current_price
+        msg = (
+            f"[BUY]  {ticker} @ {current_price:,.2f} KRW "
+            f"| Invested: {buy_amount:,.2f} | Rem KRW: {sim_krw:,.2f}"
+        )
+        logging.info(msg)
+        trade_log.append({"time": datetime.datetime.now(), "action": "BUY",
+                          "ticker": ticker, "price": current_price,
+                          "amount_krw": buy_amount, "units": units})
+    else:
+        krw = upbit.get_balance("KRW")
+        buy_amount = min(krw * BUY_RATIO, krw)
+        if buy_amount < MIN_BUY_KRW:
+            return
+        res = upbit.buy_market_order(ticker, buy_amount * (1 - FEE_RATE))
+        logging.info(f"[REAL BUY] {ticker} → {res}")
+        trade_log.append({"time": datetime.datetime.now(), "action": "BUY",
+                          "ticker": ticker, "price": current_price,
+                          "amount_krw": buy_amount})
+
+
+def _execute_sell(ticker: str, current_price: float, profit_ratio: float, upbit=None):
+    """Execute a sell order (simulation or real)."""
+    global sim_krw
+
+    signal_type = "TAKE PROFIT" if profit_ratio >= TAKE_PROFIT_RATIO else "STOP LOSS"
+
+    if SIMULATION_MODE:
+        units   = sim_holdings.get(ticker, 0)
+        revenue = units * current_price * (1 - FEE_RATE)
+        sim_krw += revenue
+        sim_holdings[ticker]   = 0.0
+        sim_buy_prices[ticker] = 0.0
+        msg = (
+            f"[SELL] {ticker} @ {current_price:,.2f} KRW "
+            f"({signal_type}) | P&L: {profit_ratio*100:+.2f}% | Cur KRW: {sim_krw:,.2f}"
+        )
+        logging.info(msg)
+        trade_log.append({"time": datetime.datetime.now(), "action": "SELL",
+                          "ticker": ticker, "price": current_price,
+                          "revenue_krw": revenue, "pnl_pct": profit_ratio * 100})
+    else:
+        volume = upbit.get_balance(ticker)
+        res = upbit.sell_market_order(ticker, volume)
+        logging.info(f"[REAL SELL] {ticker} ({signal_type}) → {res}")
+        trade_log.append({"time": datetime.datetime.now(), "action": "SELL",
+                          "ticker": ticker, "price": current_price,
+                          "pnl_pct": profit_ratio * 100})
+
+
+# ---------------------------------------------------------------------------
+# Final Report
+# ---------------------------------------------------------------------------
+def print_final_report(tickers: list, upbit=None):
+    """Print trade history and final asset summary before shutdown."""
+    print("\n" + "=" * 60)
+    print("  TRADE BOT SHUTDOWN REPORT")
+    print("=" * 60)
+
+    # Trade History
+    if trade_log:
+        print(f"\n{'#':>3}  {'Time':<21}  {'Action':<5}  {'Ticker':<12}  {'Price':>14}  {'P&L':>8}")
+        print("-" * 75)
+        for i, t in enumerate(trade_log, 1):
+            pnl = f"{t.get('pnl_pct', 0):+.2f}%" if "pnl_pct" in t else "-"
+            print(
+                f"{i:>3}  {str(t['time'])[:19]:<21}  {t['action']:<5}  "
+                f"{t['ticker']:<12}  {t['price']:>14,.2f}  {pnl:>8}"
+            )
+    else:
+        print("\n  No trades executed during this session.")
+
+    # Final asset calculation
+    print("\n" + "-" * 60)
+    if SIMULATION_MODE:
+        total_asset = sim_krw
+        print(f"  Remaining KRW (cash)  : {sim_krw:>15,.2f} KRW")
+        for ticker, units in sim_holdings.items():
+            if units > 0:
+                price_data = get_current_prices_bulk([ticker])
+                cur_price  = price_data.get(ticker, 0)
+                value      = units * cur_price
+                total_asset += value
+                print(f"  Holdings {ticker:<10}: {units:.6f} units @ {cur_price:,.2f} = {value:,.2f} KRW")
+        pnl_total = total_asset - SIM_START_KRW
+        pnl_pct   = (pnl_total / SIM_START_KRW) * 100
+        print(f"\n  Start Balance : {SIM_START_KRW:>15,.2f} KRW")
+        print(f"  Final Assets  : {total_asset:>15,.2f} KRW")
+        print(f"  Total P&L     : {pnl_total:>+15,.2f} KRW  ({pnl_pct:+.2f}%)")
+    else:
+        try:
+            krw_balance = upbit.get_balance("KRW")
+            print(f"  Remaining KRW: {krw_balance:,.2f} KRW")
+        except Exception:
+            print("  (Could not fetch real balance)")
+
+    print("=" * 60 + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Trading Loop (one full cycle per ticker chunk)
+# ---------------------------------------------------------------------------
+def trading_cycle(tickers: list, ticker_params: dict, upbit=None):
+    """Process one cycle of price checks and buy/sell signals for all tickers."""
+    chunk_size = 50
+    for i in range(0, len(tickers), chunk_size):
+        if _shutdown_requested:
+            return
+        chunk         = tickers[i : i + chunk_size]
+        current_prices = get_current_prices_bulk(chunk)
+        if not current_prices:
+            continue
+
+        for ticker in chunk:
+            current_price = current_prices.get(ticker, 0)
+            if current_price <= 0:
+                continue
+
+            params    = ticker_params.get(ticker, {"k": 0.5, "ma": 5})
+            ma_window = params["ma"]
+            k         = params["k"]
+
+            is_holding = (
+                sim_holdings.get(ticker, 0) > 0
+                if SIMULATION_MODE
+                else (upbit.get_balance(ticker) > 0)
+            )
+
+            if not is_holding:
+                # ── BUY SIGNAL CHECK ─────────────────────────────────────
+                df = get_ohlcv_safe(ticker, ma_window + 1)
+                if df is None or len(df) < 2:
+                    continue
+
+                ma_val     = df["close"].rolling(window=ma_window).mean().iloc[-2]
+                prev_day   = df.iloc[-2]
+                today_open = df.iloc[-1]["open"]
+                target     = today_open + (prev_day["high"] - prev_day["low"]) * k
+
+                if current_price >= target and today_open > ma_val:
+                    _execute_buy(ticker, current_price, upbit)
+
+            else:
+                # ── SELL SIGNAL CHECK ─────────────────────────────────────
+                buy_price = (
+                    sim_buy_prices.get(ticker, 0)
+                    if SIMULATION_MODE
+                    else upbit.get_avg_buy_price(ticker)
+                )
+                if buy_price <= 0:
+                    continue
+
+                profit_ratio = (current_price - buy_price) / buy_price
+                if profit_ratio >= TAKE_PROFIT_RATIO or profit_ratio <= STOP_LOSS_RATIO:
+                    _execute_sell(ticker, current_price, profit_ratio, upbit)
+
+
+# ---------------------------------------------------------------------------
+# Main Entry Point
+# ---------------------------------------------------------------------------
 def main():
-    logging.info(f"=========================================")
-    logging.info(f"🚀 Starting Upbit Auto Trading Bot")
-    logging.info(f"🛠️ Mode: {'[SIMULATION]' if SIMULATION_MODE else '[REAL TRADING]'} ")
-    logging.info(f"=========================================")
+    global sim_krw, sim_holdings, sim_buy_prices
 
-    # Initialize Upbit instance for Real Mode
+    logging.info("=" * 50)
+    logging.info("  🚀  Upbit Auto Trading Bot  –  START")
+    logging.info(f"  🔧  Mode   : {'SIMULATION' if SIMULATION_MODE else 'REAL TRADING'}")
+    logging.info(f"  💰  Capital: {SIM_START_KRW:,.0f} KRW (sim)")
+    logging.info("=" * 50)
+
+    # Real-mode auth
     upbit = None
     if not SIMULATION_MODE:
         if not ACCESS_KEY or not SECRET_KEY:
@@ -109,84 +275,48 @@ def main():
         upbit = pyupbit.Upbit(ACCESS_KEY, SECRET_KEY)
         logging.info("Upbit real API connected.")
 
-    # Tracking simulation balances
-    sim_krw = 1000000.0  # Start with 1 million won
-    sim_holdings = {t: 0.0 for t in TICKERS}
-    sim_buy_prices = {t: 0.0 for t in TICKERS}
+    sim_krw = SIM_START_KRW
 
-    while True:
-        try:
-            current_prices = get_current_prices_bulk(TICKERS)
-            if not current_prices:
-                time.sleep(1)
-                continue
+    # ── Step 1 : Fetch top-100 tickers ───────────────────────────────────
+    logging.info(f"Fetching top {TICKER_LIMIT} tickers by 24h volume...")
+    tickers = get_top_volume_tickers(TICKER_LIMIT)
+    logging.info(f"→ {len(tickers)} tickers selected.  Top-5: {tickers[:5]}")
 
-            for ticker in TICKERS:
-                current_price = current_prices.get(ticker, 0)
-                if current_price == 0: continue
+    sim_holdings   = {t: 0.0 for t in tickers}
+    sim_buy_prices = {t: 0.0 for t in tickers}
 
-                target_price = get_target_price(ticker, 0.5)
-                ma5 = get_ma(ticker, 5)
+    # ── Step 2 : Initial parameter optimisation (learning phase) ─────────
+    logging.info(f"Running initial parameter optimisation (lookback={TRAIN_DAYS}d)...")
+    ticker_params  = build_ticker_params(tickers, TRAIN_DAYS)
+    last_train_dt  = datetime.datetime.now()
+    logging.info("Initial optimisation complete.  Starting trading loop...")
 
-                # Check if holding
-                if SIMULATION_MODE:
-                    is_holding = sim_holdings[ticker] > 0
-                else:
-                    is_holding = upbit.get_balance(ticker) > 0
+    # ── Step 3 : Main 24/7 trading loop ──────────────────────────────────
+    try:
+        while not _shutdown_requested:
+            # Periodic re-training
+            hours_since_train = (datetime.datetime.now() - last_train_dt).total_seconds() / 3600
+            if hours_since_train >= RETRAIN_HOURS:
+                logging.info(f"⏰ {RETRAIN_HOURS}h elapsed – refreshing tickers & re-optimising...")
+                tickers        = get_top_volume_tickers(TICKER_LIMIT)
+                ticker_params  = build_ticker_params(tickers, TRAIN_DAYS)
+                # Extend holdings dicts for any newly-added tickers
+                for t in tickers:
+                    sim_holdings.setdefault(t, 0.0)
+                    sim_buy_prices.setdefault(t, 0.0)
+                last_train_dt = datetime.datetime.now()
+                logging.info("Re-optimisation complete.")
 
-                # --- 1. BUY LOGIC ---
-                # Strategy: Volatility Breakout + MA5 Filter (Uptrend)
-                if not is_holding and current_price >= target_price and current_price >= ma5:
-                    logging.info(f"[{ticker}] 📈 BUY SIGNAL (Target: {target_price:,.0f} | MA5: {ma5:,.0f} | Cur: {current_price:,.0f})")
-                    
-                    if SIMULATION_MODE:
-                        buy_amount = min(sim_krw * 0.2, sim_krw) # Use up to 20% of balance
-                        if buy_amount >= 5000:
-                            fee = buy_amount * 0.0005
-                            units = (buy_amount - fee) / current_price
-                            sim_krw -= buy_amount
-                            sim_holdings[ticker] = units
-                            sim_buy_prices[ticker] = current_price
-                            logging.info(f"   [SIMULATION BUY] {ticker} - Rem KRW: {sim_krw:,.0f}")
-                    else:
-                        krw = upbit.get_balance("KRW")
-                        buy_amount = min(krw * 0.2, krw)
-                        if buy_amount >= 5000:
-                            res = upbit.buy_market_order(ticker, buy_amount * 0.9995) # 0.05% buffer for fees
-                            logging.info(f"   [REAL BUY] {ticker} - Result: {res}")
+            trading_cycle(tickers, ticker_params, upbit)
+            time.sleep(0.5)
 
-                # --- 2. SELL LOGIC ---
-                # Sell simple profit-taking (e.g. +3%) or stop-loss (-2%)
-                if is_holding:
-                    buy_price = sim_buy_prices[ticker] if SIMULATION_MODE else upbit.get_avg_buy_price(ticker)
-                    
-                    if buy_price > 0:
-                        profit_ratio = (current_price - buy_price) / buy_price
-                        
-                        # Sell if +3% or -2%
-                        if profit_ratio >= 0.03 or profit_ratio <= -0.02:
-                            signal_type = "PROFIT" if profit_ratio >= 0.03 else "STOP LOSS"
-                            logging.info(f"[{ticker}] 📉 SELL SIGNAL ({signal_type}) - Ratio: {profit_ratio*100:.2f}%")
-                            
-                            if SIMULATION_MODE:
-                                units = sim_holdings[ticker]
-                                revenue = units * current_price
-                                fee = revenue * 0.0005
-                                sim_krw += (revenue - fee)
-                                sim_holdings[ticker] = 0.0
-                                sim_buy_prices[ticker] = 0.0
-                                logging.info(f"   [SIMULATION SELL] {ticker} - Rev: {revenue:,.0f} | Cur KRW: {sim_krw:,.0f}")
-                            else:
-                                volume = upbit.get_balance(ticker)
-                                res = upbit.sell_market_order(ticker, volume)
-                                logging.info(f"   [REAL SELL] {ticker} - Result: {res}")
+    except Exception as e:
+        logging.error(f"Unexpected error in main loop: {e}", exc_info=True)
 
-            # Sleep to avoid rate limits
-            time.sleep(1)
+    finally:
+        # ── Shutdown report ───────────────────────────────────────────────
+        print_final_report(tickers, upbit)
 
-        except Exception as e:
-            logging.error(f"Error during execution: {e}")
-            time.sleep(5)
 
 if __name__ == "__main__":
     main()
