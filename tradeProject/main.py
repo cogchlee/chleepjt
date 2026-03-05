@@ -17,7 +17,12 @@ import time
 import signal
 import logging
 import datetime
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    logging.warning("python-dotenv not installed. Skipping `.env` file load.")
 
 try:
     import pyupbit
@@ -34,7 +39,6 @@ from trade_utils import (
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
