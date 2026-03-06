@@ -61,6 +61,11 @@ pip install pyupbit python-dotenv
 UPBIT_ACCESS_KEY="본인의_ACCESS_KEY"
 UPBIT_SECRET_KEY="본인의_SECRET_KEY"
 
+# Email Configuration (정기 상태 메일 발송용)
+EMAIL_USER="your_email@gmail.com"
+EMAIL_PASSWORD="your_app_password"
+EMAIL_RECEIVER="receiver_email@example.com"
+
 # 실행 모드
 # True  → 시뮬레이션 모드 (가상 자금 10,000원으로 매매 로직 검증, 실제 주문 없음)
 # False → 실전 모드 (실제 계좌 자금으로 자동 매수/매도 주문 실행)
@@ -99,16 +104,16 @@ python main.py
 
 ## ⚙️ 설정 값 (main.py 상단)
 
-| 변수 | 기본값 | 설명 |
-|------|--------|------|
-| `SIM_START_KRW` | 10,000 | 시뮬레이션 시작 자본금 (KRW) |
-| `TICKER_LIMIT` | 100 | 거래 대상 코인 수 |
-| `TRAIN_DAYS` | 14 | 파라미터 최적화에 사용할 과거 일수 |
-| `RETRAIN_HOURS` | 24 | 자동 재학습 주기 (시간) |
-| `BUY_RATIO` | 0.10 | 매수 시 잔고 대비 투입 비율 (10%) |
-| `MIN_BUY_KRW` | 500 | 최소 주문 금액 (KRW) |
-| `TAKE_PROFIT_RATIO` | 0.05 | 익절 기준 (+5%) |
-| `STOP_LOSS_RATIO` | -0.03 | 손절 기준 (−3%) |
+| 변수                | 기본값 | 설명                               |
+| ------------------- | ------ | ---------------------------------- |
+| `SIM_START_KRW`     | 10,000 | 시뮬레이션 시작 자본금 (KRW)       |
+| `TICKER_LIMIT`      | 100    | 거래 대상 코인 수                  |
+| `TRAIN_DAYS`        | 14     | 파라미터 최적화에 사용할 과거 일수 |
+| `RETRAIN_HOURS`     | 24     | 자동 재학습 주기 (시간)            |
+| `BUY_RATIO`         | 0.10   | 매수 시 잔고 대비 투입 비율 (10%)  |
+| `MIN_BUY_KRW`       | 500    | 최소 주문 금액 (KRW)               |
+| `TAKE_PROFIT_RATIO` | 0.05   | 익절 기준 (+5%)                    |
+| `STOP_LOSS_RATIO`   | -0.03  | 손절 기준 (−3%)                    |
 
 ---
 

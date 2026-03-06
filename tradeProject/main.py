@@ -17,6 +17,9 @@ import time
 import signal
 import logging
 import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 try:
     from dotenv import load_dotenv
@@ -48,6 +51,10 @@ logging.basicConfig(
 ACCESS_KEY        = os.environ.get("UPBIT_ACCESS_KEY", "")
 SECRET_KEY        = os.environ.get("UPBIT_SECRET_KEY", "")
 SIMULATION_MODE   = os.environ.get("SIMULATION_MODE", "True").lower() in ("true", "1", "yes")
+
+EMAIL_USER        = os.environ.get("EMAIL_USER", "")
+EMAIL_PASSWORD    = os.environ.get("EMAIL_PASSWORD", "")
+EMAIL_RECEIVER    = os.environ.get("EMAIL_RECEIVER", "")
 
 SIM_START_KRW     = 10_000.0    # Simulation starting balance (KRW)
 TICKER_LIMIT      = 100         # Number of tickers to trade
@@ -201,6 +208,52 @@ def print_final_report(tickers: list, upbit=None):
 
 
 # ---------------------------------------------------------------------------
+# Notification (Email)
+# ---------------------------------------------------------------------------
+def send_status_email(tickers: list, upbit=None):
+    """Send an email containing the current trading status and balances."""
+    if not EMAIL_USER or not EMAIL_PASSWORD or not EMAIL_RECEIVER:
+        return
+
+    subject = f"[{'SIMULATION' if SIMULATION_MODE else 'REAL'}] Upbit Trading Bot Status"
+    
+    body = f"<h2>Trading Bot Status Updates</h2>"
+    body += f"<p>Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>"
+    body += f"<ul>"
+    if SIMULATION_MODE:
+        body += f"<li><strong>KRW Balance:</strong> {sim_krw:,.0f} KRW</li>"
+        for t, units in sim_holdings.items():
+            if units > 0:
+                body += f"<li><strong>{t}:</strong> {units:.6f}</li>"
+    else:
+        if upbit:
+            try:
+                krw = upbit.get_balance("KRW")
+                body += f"<li><strong>KRW Balance:</strong> {krw:,.0f} KRW</li>"
+                for t in tickers:
+                    units = upbit.get_balance(t)
+                    if units > 0:
+                        body += f"<li><strong>{t}:</strong> {units:.6f}</li>"
+            except Exception as e:
+                body += f"<li>Error fetching real balances: {e}</li>"
+
+    body += f"</ul>"
+
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_USER
+    msg['To'] = EMAIL_RECEIVER
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_USER, EMAIL_PASSWORD)
+            server.send_message(msg)
+        logging.info("Status email sent successfully.")
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
+
+# ---------------------------------------------------------------------------
 # Trading Loop (one full cycle per ticker chunk)
 # ---------------------------------------------------------------------------
 def trading_cycle(tickers: list, ticker_params: dict, upbit=None):
@@ -296,10 +349,20 @@ def main():
     logging.info("Initial optimisation complete.  Starting trading loop...")
 
     # ── Step 3 : Main 24/7 trading loop ──────────────────────────────────
+    last_email_sent_hour = -1
+
     try:
         while not _shutdown_requested:
+            now = datetime.datetime.now()
+            
+            # Send email periodically (every 6 hours at 00, 06, 12, 18 KST)
+            if now.hour in [0, 6, 12, 18] and now.hour != last_email_sent_hour:
+                logging.info(f"Triggering scheduled status email (Hour: {now.hour})")
+                send_status_email(tickers, upbit)
+                last_email_sent_hour = now.hour
+
             # Periodic re-training
-            hours_since_train = (datetime.datetime.now() - last_train_dt).total_seconds() / 3600
+            hours_since_train = (now - last_train_dt).total_seconds() / 3600
             if hours_since_train >= RETRAIN_HOURS:
                 logging.info(f"⏰ {RETRAIN_HOURS}h elapsed – refreshing tickers & re-optimising...")
                 tickers        = get_top_volume_tickers(TICKER_LIMIT)
