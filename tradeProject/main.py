@@ -351,6 +351,10 @@ def main():
     # ── Step 3 : Main 24/7 trading loop ──────────────────────────────────
     last_email_sent_hour = -1
 
+    # Send an initial startup email notification
+    logging.info("Sending initial startup status email...")
+    send_status_email(tickers, upbit)
+
     try:
         while not _shutdown_requested:
             now = datetime.datetime.now()
