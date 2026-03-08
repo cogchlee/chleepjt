@@ -62,22 +62,22 @@ CATEGORIES = [
         ],
         "feeds": [
             {
-                "topic": "AI Agent, AI Tool, AI Assistant",
+                "topic": "AI Agent, Tool, Assistant",
                 "url_ko": "https://news.google.com/rss/search?q=AI+%28%EC%97%90%EC%9D%B4%EC%A0%84%ED%8A%B8+OR+%ED%88%B4+OR+%EC%96%B4%EC%8B%9C%EC%8A%A4%ED%84%B4%ED%8A%B8%29+AND+%28%EA%B8%B0%EC%88%A0+OR+%EB%8F%99%ED%96%A5+OR+%EC%82%AC%EC%97%85%29&hl=ko&gl=KR&ceid=KR:ko",
                 "url_en": "https://news.google.com/rss/search?q=AI+%28Agent+OR+Tool+OR+Assistant%29+AND+%28technology+OR+trend+OR+business+OR+research%29&hl=en-US&gl=US&ceid=US:en"
             },
             {
-                "topic": "Machine Learning Articles",
+                "topic": "AI and Machine Learning Research",
                 "url_ko": "https://news.google.com/rss/search?q=%EB%A8%B8%EC%8B%A0%EB%9F%AC%EB%8B%9D+AND+%28%EA%B8%B0%EC%88%A0+OR+%EB%8F%99%ED%96%A5+OR+%EC%82%AC%EC%97%85+OR+%EC%97%B0%EA%B5%AC%29&hl=ko&gl=KR&ceid=KR:ko",
                 "url_en": "https://news.google.com/rss/search?q=%22Machine+Learning%22+AND+%28technology+OR+trend+OR+business+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
             },
             {
-                "topic": "Image Processing, Computer Vision Articles",
+                "topic": "Image Processing, Computer Vision",
                 "url_ko": "https://news.google.com/rss/search?q=%28%EC%9D%B4%EB%AF%B8%EC%A7%80+%EC%B2%98%EB%A6%AC+OR+%EC%BB%B4%ED%93%A8%ED%84%B0+%EB%B9%84%EC%A0%84%29+AND+%28%EA%B8%B0%EC%88%A0+OR+%EB%8F%99%ED%96%A5+OR+%EC%82%AC%EC%97%85%29&hl=ko&gl=KR&ceid=KR:ko",
                 "url_en": "https://news.google.com/rss/search?q=%28%22Image+Processing%22+OR+%22Computer+Vision%22%29+AND+%28technology+OR+trend+OR+business+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
             },
             {
-                "topic": "AI, ML, CV, Image Processing Related Papers",
+                "topic": "Computer Vision, Image Processing Research with AI",
                 "url_ko": "https://news.google.com/rss/search?q=%28AI+OR+%EB%A8%B8%EC%8B%A0%EB%9F%AC%EB%8B%9D+OR+%EC%BB%B4%ED%93%A8%ED%84%B0%EB%B9%84%EC%A0%84+OR+%EC%9D%B4%EB%AF%B8%EC%A7%80%EC%B2%98%EB%A6%AC%29+AND+%28%EB%85%BC%EB%AC%B8+OR+%EC%97%B0%EA%B5%AC%29&hl=ko&gl=KR&ceid=KR:ko",
                 "url_en": "https://news.google.com/rss/search?q=%28AI+OR+%22Machine+Learning%22+OR+%22Computer+Vision%22+OR+%22Image+Processing%22%29+AND+%28paper+OR+research+OR+study+OR+academic%29&hl=en-US&gl=US&ceid=US:en"
             }
@@ -95,12 +95,12 @@ CATEGORIES = [
             "FORWARD_EMAIL": CAT2_FORWARD_EMAIL
         },
         "keywords_en": [
-            "education", "childhood", "literacy", "learning", "development", 
-            "preschool", "reading", "student", "child", "kids", "parenting"
+            "early childhood", "preschool", "infant", "toddler",
+            "literacy", "early reading", "child development", "parenting"
         ],
         "keywords_ko": [
-            "교육", "유아", "발달", "문해력", "독서", 
-            "학습", "학교", "아이", "부모", "아동", "육아"
+            "영유아 교육", "영유아 문해력", "조기 교육", "유아동",
+            "어린이집", "유치원", "아동 발달", "육아"
         ],
         "feeds": [
             {

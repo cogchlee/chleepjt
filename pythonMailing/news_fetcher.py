@@ -19,30 +19,45 @@ KO_PATTERN = re.compile(r'[\uAC00-\uD7A3]')
 
 def load_sent_links():
     if not os.path.exists(config.SENT_LINKS_FILE):
-        return set(), ""
+        return {}
     try:
         with open(config.SENT_LINKS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        last_reset_date = data.get("date", "")
+            
+        links_dict = data.get("links_dict", {})
+        
+        # Backwards compatibility: if there's old list-based links, convert them
+        old_links = data.get("links", [])
+        if isinstance(old_links, list) and old_links:
+            now_str = datetime.now().strftime("%Y-%m-%d")
+            for url in old_links:
+                if url not in links_dict:
+                    links_dict[url] = now_str
+                    
+        # Pruning logic: keep only links from the last 3 days
         now = datetime.now()
-        today = now.strftime("%Y-%m-%d")
-        if now.weekday() == 6 and last_reset_date != today:
-            logger.info("Weekly reset: It's Sunday. Clearing sent links tracker.")
-            return set(), today
-        return set(data.get("links", [])), last_reset_date
+        pruned_links = {}
+        for url, date_str in links_dict.items():
+            try:
+                added_date = datetime.strptime(date_str, "%Y-%m-%d")
+                if (now - added_date).days <= 3:
+                    pruned_links[url] = date_str
+            except ValueError:
+                pass
+                
+        return pruned_links
     except Exception as e:
         logger.error(f"Failed to load sent links: {e}")
-        return set(), ""
+        return {}
 
-def save_sent_links(links_set, last_reset_date):
+def save_sent_links(links_dict):
     try:
         data = {
-            "date": last_reset_date,
-            "links": list(links_set)
+            "links_dict": links_dict
         }
         with open(config.SENT_LINKS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved {len(links_set)} cumulative sent links to tracker (Last reset: {last_reset_date}).")
+        logger.info(f"Saved {len(links_dict)} tracked sent links (rolling 3-day history).")
     except Exception as e:
         logger.error(f"Failed to save sent links: {e}")
 
@@ -207,9 +222,11 @@ def _build_bilingual(candidate: dict) -> dict:
 
 def fetch_news_for_category(category_config: dict, candidate_pool: int = 10):
     news_items = []
-    sent_links, last_reset_date = load_sent_links()
+    sent_links_dict = load_sent_links()
+    sent_links_set = set(sent_links_dict.keys())
     
     current_iteration_links = set()
+    today_str = datetime.now().strftime("%Y-%m-%d")
     
     keywords_en = category_config.get("keywords_en", [])
     keywords_ko = category_config.get("keywords_ko", [])
@@ -220,28 +237,36 @@ def fetch_news_for_category(category_config: dict, candidate_pool: int = 10):
         url_en = feed_info.get("url_en", feed_info.get("url", ""))
 
         logger.info(f"--- Topic: {topic} ---")
+        
+        def attempt_fetch(base_url, lang_label, use_today_filter=True):
+            fetch_url = f"{base_url}+when:1d" if use_today_filter else base_url
+            logger.info(f"  Fetching {candidate_pool} {lang_label} candidates (filter_today={use_today_filter})...")
+            
+            candidates = _fetch_candidates(fetch_url, candidate_pool, topic, sent_links_set.union(current_iteration_links))
+            logger.info(f"  {len(candidates)} {lang_label} candidates collected.")
+            
+            if not candidates and use_today_filter:
+                logger.info(f"  No {lang_label} candidates found for today. Fallback to broad search...")
+                return attempt_fetch(base_url, lang_label, use_today_filter=False)
+            
+            return _pick_best(candidates, keywords_ko, keywords_en)
 
         if url_ko:
-            logger.info(f"  Fetching {candidate_pool} KO candidates (skipping duplicates)...")
-            ko_candidates = _fetch_candidates(url_ko, candidate_pool, topic, sent_links.union(current_iteration_links))
-            logger.info(f"  {len(ko_candidates)} KO candidates collected.")
-            best_ko = _pick_best(ko_candidates, keywords_ko, keywords_en)
+            best_ko = attempt_fetch(url_ko, "KO")
             if best_ko:
                 news_items.append(_build_bilingual(best_ko))
                 current_iteration_links.add(best_ko["link"])
 
         if url_en:
-            logger.info(f"  Fetching {candidate_pool} EN candidates (skipping duplicates)...")
-            en_candidates = _fetch_candidates(url_en, candidate_pool, topic, sent_links.union(current_iteration_links))
-            logger.info(f"  {len(en_candidates)} EN candidates collected.")
-            best_en = _pick_best(en_candidates, keywords_ko, keywords_en)
+            best_en = attempt_fetch(url_en, "EN")
             if best_en:
                 news_items.append(_build_bilingual(best_en))
                 current_iteration_links.add(best_en["link"])
 
     if news_items:
-        sent_links.update(current_iteration_links)
-        save_sent_links(sent_links, last_reset_date)
+        for link in current_iteration_links:
+            sent_links_dict[link] = today_str
+        save_sent_links(sent_links_dict)
 
     logger.info(f"Total articles selected for {category_config.get('name')}: {len(news_items)}")
     return news_items
