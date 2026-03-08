@@ -76,14 +76,24 @@ pm2 start ./venv/bin/python --name "MailingSystem" -- -u pythonMailing/main.py
 
 # 9-2. Upbit Auto Trading Bot 실행 등록
 pm2 start ./venv/bin/python --name "TradeSys" -- -u tradeProject/main.py
+```
 
-# 10. 서버 재부팅 시 자동 시작 시스템(Startup Hook) 설정
+### [중요] 03. Auto Lottery Prediction System (dhlotteryCheck)
+이 시스템은 매주 `로또 6/45`와 `연금복권 720` 알고리즘 분석값을 돌리고, 매일 3회 `트리플럭` 전자복권의 최적 구매 시점을 예측하여 이메일로 전송합니다.
+
+`chleepjt` 디렉토리 최상위 경로에서 동일한 가상환경(`venv`)을 사용하여 PM2 데몬을 띄웁니다:
+```bash
+pm2 start ./venv/bin/python --name "LotteryCheck" -- dhlotteryCheck/main.py
+```
+
+---
+
+## 5. PM2 관리 명령어 요약시 자동 시작 시스템(Startup Hook) 설정
 pm2 startup
 # (중요: 위 명령어 입력 시 터미널에 출력되는 'sudo env ...' 로 시작하는 문장을 복사 후 그대로 다시 실행해야 합니다)
 
 # 11. 현재 PM2에 등록된 프로세스 목록 영구 저장
 pm2 save
-```
 
 ### 📋 PM2 Management Commands (유용한 관리 명령어)
 
