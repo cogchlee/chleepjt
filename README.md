@@ -11,7 +11,7 @@
 | --- | ------------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 01  | [Mailing System](./pythonMailing/)    | Python           | ✅ Active         | AI, ML, Education & Literacy News Auto Collection and Auth Mailing System (AI, ML, 교육/문해력 뉴스 자동 수집 및 이메일 발송 시스템) |
 | 02  | [Upbit Auto Trading](./tradeProject/) | Python           | ✅ Active         | Upbit API Auto Trading Bot with Simulation Mode (업비트 가상자산 자동매매 및 모의투자 봇)                                            |
-| 03  | —                                     | —                | 🔜 Planned (예정) | —                                                                                                                                    |
+| 03  | [Auto Lottery Prediction](./dhlotteryCheck/) | Python           | ✅ Active         | Lottery prediction algorithm with scheduled reporting (로또/연금복권 패턴 분석 및 메일링 봇)                                             |
 
 ---
 
@@ -31,6 +31,13 @@ Project/
 │   ├── main.py             #   Trading bot main loop (자동매매 봇 메인 루프)
 │   ├── test_simulate.py    #   Simulation logic test script (모의투자 테스트 스크립트)
 │   ├── .env.example        #   Environment variables template (환경변수 템플릿)
+│   └── README.md           #   Project detail docs (프로젝트 상세 설명)
+├── dhlotteryCheck/         # 03. Auto Lottery Prediction System
+│   ├── main.py             #   Scheduler & Main loop (스케줄러 메인 루프)
+│   ├── lotto_analyzer.py   #   Lotto & Pension logic (로또/연금복권 추천 알고리즘)
+│   ├── triple_luck_analyzer.py # Triple Luck probability (트리플럭 확률 분석)
+│   ├── mailer.py           #   Email reporting system (이메일 리포팅 전송)
+│   ├── requirements.txt    #   Python package list (Python 패키지 목록)
 │   └── README.md           #   Project detail docs (프로젝트 상세 설명)
 ├── README.md               # Repository overview (전체 저장소 소개 / 현재 파일)
 └── .gitignore
@@ -59,6 +66,14 @@ pip install pyupbit python-dotenv
 python main.py
 ```
 
+### 03. Auto Lottery Prediction System
+```bash
+cd dhlotteryCheck
+pip install -r requirements.txt
+# Set up .env file before running (실행 전 .env 파일 설정 필수)
+python main.py
+```
+
 ---
 
 ## 🛠 Tech Stack (기술 스택)
@@ -83,7 +98,14 @@ python main.py
 | Strategy (전략)       | Volatility Breakout + Moving Average |
 | Configuration (설정)  | `python-dotenv`                      |
 
-### 03. — *(TBD)*
+### 03. Auto Lottery Prediction System
+
+| Category (분류)         | Tools                                |
+| ----------------------- | ------------------------------------ |
+| Language (언어)         | Python 3.8+                          |
+| Data Processing (데이터)| `pandas`, `beautifulsoup4`           |
+| Scheduling (스케줄링)   | `schedule` library                   |
+| Notification (알림)     | SMTP (Gmail)                         |
 
 ---
 
