@@ -81,12 +81,6 @@ def main():
     """Main function that initializes and runs the scheduler."""
     logger.info("Welcome to the AI News Automated Mailing System.")
 
-    # Run immediately on startup for all active
-    logger.info("Executing immediate run...")
-    for category in config.get_active_categories():
-        job_for_category(category)
-        time.sleep(5)
-
     # Set up recurring schedule
     setup_schedule()
 
