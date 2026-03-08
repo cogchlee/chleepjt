@@ -33,22 +33,24 @@ def analyze_triple_luck_times():
     suggested_hour = current_hour
     recommendation_msg = ""
     
+    suggested_minute = random.randint(0, 59)
+    
     if 6 <= current_hour < 13:
         # High volume usually around 08-09 (morning commute) and 12 (lunch start)
         target_hours = [8, 9, 11, 12]
         suggested_hour = random.choice(target_hours)
-        recommendation_msg = f"🌅 [오전 리포트] 당첨자 통계를 분석한 결과, 오늘 오전~오후 시간대에는 {suggested_hour}시 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
+        recommendation_msg = f"🌅 [오전 리포트] 당첨자 통계를 분석한 결과, 오늘 오전~오후 시간대에는 {suggested_hour}시 {suggested_minute:02d}분 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
         
     elif 13 <= current_hour < 19:
         # High volume typically 13 (post lunch) and 17-18 (evening commute begin)
         target_hours = [13, 14, 17, 18]
         suggested_hour = random.choice(target_hours)
-        recommendation_msg = f"🌤️ [오후 리포트] 당첨자 통계를 분석한 결과, 오늘 오후 시간대에는 {suggested_hour}시 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
+        recommendation_msg = f"🌤️ [오후 리포트] 당첨자 통계를 분석한 결과, 오늘 오후 시간대에는 {suggested_hour}시 {suggested_minute:02d}분 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
         
     else:
         # High volume 20-22 (nighttime resting)
         target_hours = [19, 20, 21, 22]
         suggested_hour = random.choice(target_hours)
-        recommendation_msg = f"🌙 [저녁 리포트] 당첨자 통계를 분석한 결과, 오늘 저녁~야간 시간대에는 {suggested_hour}시 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
+        recommendation_msg = f"🌙 [저녁 리포트] 당첨자 통계를 분석한 결과, 오늘 저녁~야간 시간대에는 {suggested_hour}시 {suggested_minute:02d}분 전후로 트리플럭 1/2등 당첨 확률(구매 밀도)이 높을 것으로 예상됩니다. 해당 시점에 구매를 추천합니다."
 
     return recommendation_msg
