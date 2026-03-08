@@ -38,48 +38,52 @@ def fetch_lotto_history(max_draw=1100):
 def predict_lotto(frequencies, num_cases=10):
     """
     Generates 10 combinations of 6 numbers.
-    Rules:
-    - Avoid consecutive 4+ sequences.
-    - Mix Hot and Cold numbers.
-    - Ensure a mix of Odd/Even.
-    - Calculate a weight distribution based on historical occurrence.
+    Empirical Rules applied realistically:
+    - Missing grouping (1s, 10s, 20s, 30s, 40s): Real lotto VERY OFTEN misses 1 or 2 decades. We allow and encourage this.
+    - Clusters: Real lotto often has clusters (e.g., 33, 34, 36). We allow 3-consecutives probabilistically.
+    - Odd/Even: Can occasionally be extreme (e.g., 5 odd, 1 even), but 3:3 or 4:2 is most common.
     """
-    logger.info("Analyzing Lotto 6/45 patterns and generating 10 cases...")
+    logger.info("Analyzing Lotto 6/45 empirical patterns and generating 10 cases...")
     predictions = []
     
-    # Calculate probabilities based on frequency. Lower frequency = slightly higher weight to 'revert to mean',
-    # combined with some 'hot' momentum. We'll use a balanced random choice.
     numbers = list(frequencies.keys())
+    # Baseline weights based on frequency
     weights = [frequencies[n] for n in numbers]
     
     while len(predictions) < num_cases:
-        # Weighted random selection of 6 unique numbers
         case = []
-        temp_weights = list(weights) # copy
+        temp_weights = list(weights)
         temp_nums = list(numbers)
         
         for _ in range(6):
             chosen = random.choices(temp_nums, weights=temp_weights, k=1)[0]
             case.append(chosen)
-            # Remove chosen from pool to avoid duplicates
             idx = temp_nums.index(chosen)
             temp_nums.pop(idx)
             temp_weights.pop(idx)
             
         case.sort()
         
-        # Check rule: Not 6 consecutive odd or 6 even
+        # 1. Odd/Even logic (Allow extreme cases with low probability)
         odds = sum(1 for n in case if n % 2 != 0)
         evens = 6 - odds
-        if odds == 6 or evens == 6:
+        if (odds == 6 or evens == 6) and random.random() > 0.05:
+            # 6:0 or 0:6 happens roughly 1-2% of the time, so largely skip but occasionally allow
             continue
             
-        # Check rule: Not purely consecutive (e.g. 1,2,3,4,5,6)
+        # 2. Consecutive logic (Allow 3-consecutives, block 5+ consecutives)
         consecutives = 0
         for i in range(5):
             if case[i+1] == case[i] + 1:
                 consecutives += 1
-        if consecutives >= 4:
+        if consecutives >= 4: # 5 consecutive numbers is statistically negligible
+            continue
+
+        # 3. Missing Decades Logic (Empirically, missing 1 or 2 decades is standard!)
+        decades = set((n - 1) // 10 for n in case)
+        # Usually decades present are 3 or 4. If all 5 decades are present, it's actually rare.
+        if len(decades) == 5 and random.random() > 0.1:
+            # Reduce probability of cases that have EVERY decade (1s, 10s, 20s, 30s, 40s)
             continue
             
         if case not in predictions:
@@ -91,26 +95,28 @@ def predict_lotto(frequencies, num_cases=10):
 def predict_pension720(num_cases=10):
     """
     Pension 720+ format: Class (1 to 5) + 6 digit number (000000 to 999999).
-    We analyze past bonus and 1st/2nd distributions.
-    Usually, uniform distribution applies to all 6 slots independently.
-    We will generate 10 cases avoiding overly repetitive sequences (e.g., 000000).
+    Empirical Rules:
+    - It's 6 independent draws of 0-9.
+    - Duplicate digits (2, 3, or even 4 of the same digit) are completely natural and expected.
+    - We strictly prevent completely uniform impossible patterns (like 000000) that usually never win,
+      but fully allow organic multiple repetitions (e.g. 1조 344914 - three 4s).
     """
-    logger.info("Analyzing Pension 720+ patterns and generating 10 cases...")
+    logger.info("Analyzing Pension 720+ empirical patterns and generating 10 cases...")
     predictions = []
     
     classes = [1, 2, 3, 4, 5]
     
     while len(predictions) < num_cases:
         jo_class = random.choice(classes)
-        # Digits 0-9
+        # Digits 0-9 drawn independently
         digits = [random.randint(0, 9) for _ in range(6)]
         
-        # Avoid 5+ same digits
+        # We only throw out cases where ALL 6 digits are IDENTICAL (e.g., 777777).
+        # Triplets (3 same) or quadruplets (4 same) are allowed.
         counter = Counter(digits)
-        if any(count >= 5 for count in counter.values()):
+        if any(count == 6 for count in counter.values()):
             continue
             
-        # Format: 1조 234567
         digit_str = "".join(map(str, digits))
         case = f"{jo_class}조 {digit_str}"
         
