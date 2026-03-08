@@ -56,14 +56,14 @@ EMAIL_USER        = os.environ.get("EMAIL_USER", "")
 EMAIL_PASSWORD    = os.environ.get("EMAIL_PASSWORD", "")
 EMAIL_RECEIVER    = os.environ.get("EMAIL_RECEIVER", "")
 
-SIM_START_KRW     = 10_000.0    # Simulation starting balance (KRW)
+SIM_START_KRW     = 100_000.0   # Simulation starting balance (KRW)
 TICKER_LIMIT      = 100         # Number of tickers to trade
 TRAIN_DAYS        = 14          # OHLCV look-back window for optimisation
 RETRAIN_HOURS     = 24          # Re-optimise every N hours
-BUY_RATIO         = 0.10        # Allocate 10 % of remaining KRW per buy
-MIN_BUY_KRW       = 500         # Minimum order size (KRW)
+BUY_RATIO         = 0.20        # Allocate 10 % of remaining KRW per buy
+MIN_BUY_KRW       = 2000         # Minimum order size (KRW)
 TAKE_PROFIT_RATIO = 0.05        # +5 % → sell
-STOP_LOSS_RATIO   = -0.03       # −3 % → sell
+STOP_LOSS_RATIO   = -0.025       # −3 % → sell
 FEE_RATE          = 0.0005      # Upbit trading fee: 0.05 % per leg
 
 # ---------------------------------------------------------------------------
@@ -211,33 +211,91 @@ def print_final_report(tickers: list, upbit=None):
 # Notification (Email)
 # ---------------------------------------------------------------------------
 def send_status_email(tickers: list, upbit=None):
-    """Send an email containing the current trading status and balances."""
+    """Send an email containing the current trading status and balances formatted like the shutdown report."""
     if not EMAIL_USER or not EMAIL_PASSWORD or not EMAIL_RECEIVER:
         return
 
-    subject = f"[{'SIMULATION' if SIMULATION_MODE else 'REAL'}] Upbit Trading Bot Status"
+    subject = f"[{'SIMULATION' if SIMULATION_MODE else 'REAL'}] Upbit Trading Bot Report"
     
-    body = f"<h2>Trading Bot Status Updates</h2>"
-    body += f"<p>Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>"
-    body += f"<ul>"
-    if SIMULATION_MODE:
-        body += f"<li><strong>KRW Balance:</strong> {sim_krw:,.0f} KRW</li>"
-        for t, units in sim_holdings.items():
-            if units > 0:
-                body += f"<li><strong>{t}:</strong> {units:.6f}</li>"
-    else:
-        if upbit:
-            try:
-                krw = upbit.get_balance("KRW")
-                body += f"<li><strong>KRW Balance:</strong> {krw:,.0f} KRW</li>"
-                for t in tickers:
-                    units = upbit.get_balance(t)
-                    if units > 0:
-                        body += f"<li><strong>{t}:</strong> {units:.6f}</li>"
-            except Exception as e:
-                body += f"<li>Error fetching real balances: {e}</li>"
+    # CSS styling for the tables
+    body = f"<h2>Trading Bot Status Report</h2>"
+    body += f"<p><strong>Time:</strong> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>"
+    body += """
+    <style>
+        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+    """
 
-    body += f"</ul>"
+    # 1. Trade History Table
+    body += f"<h3>Trade History (Recent Log)</h3>"
+    if trade_log:
+        body += "<table>"
+        body += "<tr><th>#</th><th>Time</th><th>Action</th><th>Ticker</th><th>Price (KRW)</th><th>P&L / Units</th></tr>"
+        for i, t in enumerate(trade_log, 1):
+            time_str = str(t['time'])[:19]
+            price_str = f"{t['price']:,.2f}"
+            if t['action'] == "SELL":
+                pnl = f"{t.get('pnl_pct', 0):+.2f}%"
+            else:
+                pnl = f"{t.get('units', 0):.6f} u" if SIMULATION_MODE else "-"
+            body += f"<tr><td>{i}</td><td>{time_str}</td><td>{t['action']}</td><td>{t['ticker']}</td><td>{price_str}</td><td>{pnl}</td></tr>"
+        body += "</table>"
+    else:
+        body += "<p>No trades executed during this session.</p>"
+
+    # 2. Final Asset Calculation Table
+    body += f"<h3>Asset Summary</h3>"
+    body += "<table>"
+    
+    if SIMULATION_MODE:
+        total_asset = sim_krw
+        body += f"<tr><td><strong>Remaining Cash (KRW)</strong></td><td colspan='2'>{sim_krw:,.2f}</td></tr>"
+        body += "<tr><th>Holding</th><th>Units</th><th>Current Value (KRW)</th></tr>"
+        
+        for ticker, units in sim_holdings.items():
+            if units > 0:
+                price_data = get_current_prices_bulk([ticker])
+                cur_price  = price_data.get(ticker, 0)
+                value      = units * cur_price
+                total_asset += value
+                body += f"<tr><td>{ticker}</td><td>{units:.6f} @ {cur_price:,.2f}</td><td>{value:,.2f}</td></tr>"
+                
+        pnl_total = total_asset - SIM_START_KRW
+        pnl_pct   = (pnl_total / SIM_START_KRW) * 100
+        
+        body += f"<tr><td><strong>Start Balance</strong></td><td colspan='2'>{SIM_START_KRW:,.2f}</td></tr>"
+        body += f"<tr><td><strong>Total Assets</strong></td><td colspan='2'>{total_asset:,.2f}</td></tr>"
+        color = "red" if pnl_total < 0 else "blue"
+        body += f"<tr><td><strong>Total P&L</strong></td><td colspan='2' style='color:{color}'><b>{pnl_total:>+,.2f} ({pnl_pct:+.2f}%)</b></td></tr>"
+    else:
+        try:
+            krw_balance = upbit.get_balance("KRW")
+            body += f"<tr><td><strong>Remaining Cash (KRW)</strong></td><td colspan='2'>{krw_balance:,.2f}</td></tr>"
+            body += "<tr><th>Holding</th><th>Units</th><th>Current Value (KRW)</th></tr>"
+            
+            # Fetch all accounts balances
+            balances = upbit.get_balances()
+            total_estimated_krw = krw_balance
+            
+            for b in balances:
+                currency = b['currency']
+                if currency == 'KRW': continue
+                ticker = f"KRW-{currency}"
+                if ticker in tickers:
+                    units = float(b['balance'])
+                    if units > 0:
+                        cur_price = get_current_prices_bulk([ticker]).get(ticker, 0)
+                        value = units * cur_price
+                        total_estimated_krw += value
+                        body += f"<tr><td>{ticker}</td><td>{units:.6f} @ {cur_price:,.2f}</td><td>{value:,.2f}</td></tr>"
+            
+            body += f"<tr><td><strong>Total Estimated Assets (KRW)</strong></td><td colspan='2'>{total_estimated_krw:,.2f}</td></tr>"
+        except Exception as e:
+            body += f"<tr><td colspan='3'>Error fetching real balances: {e}</td></tr>"
+
+    body += "</table>"
 
     msg = MIMEMultipart()
     msg['From'] = EMAIL_USER
@@ -249,9 +307,9 @@ def send_status_email(tickers: list, upbit=None):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(EMAIL_USER, EMAIL_PASSWORD)
             server.send_message(msg)
-        logging.info("Status email sent successfully.")
+        logging.info("Status email report sent successfully.")
     except Exception as e:
-        logging.error(f"Failed to send email: {e}")
+        logging.error(f"Failed to send email report: {e}")
 
 # ---------------------------------------------------------------------------
 # Trading Loop (one full cycle per ticker chunk)
@@ -350,10 +408,6 @@ def main():
 
     # ── Step 3 : Main 24/7 trading loop ──────────────────────────────────
     last_email_sent_hour = -1
-
-    # Send an initial startup email notification
-    logging.info("Sending initial startup status email...")
-    send_status_email(tickers, upbit)
 
     try:
         while not _shutdown_requested:
