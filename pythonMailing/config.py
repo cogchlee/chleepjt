@@ -32,11 +32,11 @@ SCHEDULE_TYPE = os.getenv("SCHEDULE_TYPE", "once_daily")
 CAT2_SCHEDULE_TYPE = os.getenv("CAT2_SCHEDULE_TYPE", "once_daily")
 
 # Category 2 Configuration
-# If CAT2 specific credentials are not provided, it falls back to the base credentials to avoid duplication.
-CAT2_SENDER_EMAIL = os.getenv("CAT2_SENDER_EMAIL", SENDER_EMAIL)
-CAT2_SENDER_PASSWORD = os.getenv("CAT2_SENDER_PASSWORD", SENDER_PASSWORD)
-CAT2_RECEIVER_EMAIL = os.getenv("CAT2_RECEIVER_EMAIL", RECEIVER_EMAIL)
-CAT2_FORWARD_EMAIL = os.getenv("CAT2_FORWARD_EMAIL", FORWARD_EMAIL)
+# CAT1 and CAT2 configurations operate independently.
+CAT2_SENDER_EMAIL = os.getenv("CAT2_SENDER_EMAIL", "")
+CAT2_SENDER_PASSWORD = os.getenv("CAT2_SENDER_PASSWORD", "")
+CAT2_RECEIVER_EMAIL = os.getenv("CAT2_RECEIVER_EMAIL", "")
+CAT2_FORWARD_EMAIL = os.getenv("CAT2_FORWARD_EMAIL", "")
 
 # Categories definition
 CATEGORIES = [

@@ -110,7 +110,9 @@ def send_email(subject, news_items, credentials, header_title=None):
         
         # Collect all recipients
         recipients = [receiver_email]
-        if forward_email and str(forward_email).strip().upper() != "NONE":
+        
+        forward_clean = str(forward_email).strip().upper() if forward_email else ""
+        if forward_clean and forward_clean != "NONE":
             kst_now = datetime.utcnow() + timedelta(hours=9)
             if kst_now.weekday() < 5:  # 0=Mon, ..., 4=Fri, 5=Sat, 6=Sun
                 recipients.append(forward_email.strip())
