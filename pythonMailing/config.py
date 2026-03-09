@@ -11,7 +11,7 @@ logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("ai_news_mailing.log"),
+        logging.FileHandler(os.path.join(os.path.dirname(__file__), "ai_news_mailing.log")),
         logging.StreamHandler()
     ]
 )

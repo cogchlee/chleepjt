@@ -27,7 +27,7 @@
 SENDER_EMAIL          # 발송자 이메일
 SENDER_PASSWORD       # 발송자 비밀번호
 RECEIVER_EMAIL        # 수신자 이메일
-FORWARD_EMAIL         # (선택) 전달 주소 ("NONE" 입력 시 전달 생략)
+FORWARD_EMAIL         # (선택) 전달 주소 ("NONE" 입력 시 및 한국 시간 주말(토/일)에는 발송 생략)
 
 # 선택 환경 변수 (카테고리 2: Education & Literacy)
 CAT2_SENDER_EMAIL     # 미입력 시 SENDER_EMAIL 로 폴백
@@ -73,7 +73,7 @@ feedparser 예외 처리
 - 추출된 뉴스를 깔끔한 **Toss 스타일 다크 모드 HTML** 형식으로 포맷팅
 - 모서리가 둥근 세련된 UI, 시그니처 블루 액센트 적용
 - 영문 / 한글 이중 제목 및 요약 (본문 제목과 날짜 분리 UI)
-- 수신자 및 전달 주소(`FORWARD_EMAIL`)로 발송 (단, "NONE"으로 설정 시 Forward 거부)
+- 수신자 및 전달 주소(`FORWARD_EMAIL`)로 발송 (단, "NONE"으로 설정하거나 한국 시간 기준 주말인 경우 Forward 발송 생략)
 - **강화된 SMTP 예외 처리**: 인증 실패 시 로깅 보강
 
 ### Main Orchestration (메인 오케스트레이션)
@@ -177,7 +177,7 @@ python main.py
 ## 로깅 및 모니터링
 
 ### 로그 파일 위치
-`pythonMailing/ai_news_mailing.log`
+`pythonMailing/ai_news_mailing.log` (스크립트 실행 위치와 무관하게 `pythonMailing` 디렉토리 내에 안정적으로 생성됨)
 
 ### 로그 레벨별 정보
 
