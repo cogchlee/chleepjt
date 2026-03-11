@@ -33,7 +33,7 @@ except ImportError:
     pyupbit = None
 
 from trade_utils import (
-    get_top_volume_tickers,
+    get_target_tickers,
     get_current_prices_bulk,
     get_ohlcv_safe,
     build_ticker_params,
@@ -57,13 +57,15 @@ EMAIL_PASSWORD    = os.environ.get("EMAIL_PASSWORD", "")
 EMAIL_RECEIVER    = os.environ.get("EMAIL_RECEIVER", "")
 
 SIM_START_KRW     = 100_000.0   # Simulation starting balance (KRW)
-TICKER_LIMIT      = 100         # Number of tickers to trade
+TICKER_LIMIT      = 10          # Top 10 by volume + Top 10 by gain (max 20)
 TRAIN_DAYS        = 14          # OHLCV look-back window for optimisation
 RETRAIN_HOURS     = 24          # Re-optimise every N hours
-BUY_RATIO         = 0.20        # Allocate 10 % of remaining KRW per buy
-MIN_BUY_KRW       = 2000         # Minimum order size (KRW)
-TAKE_PROFIT_RATIO = 0.05        # +5 % → sell
-STOP_LOSS_RATIO   = -0.025       # −3 % → sell
+BUY_RATIO         = 0.20        # Allocate 20 % of remaining KRW per buy
+MIN_BUY_KRW       = 2000        # Minimum order size (KRW)
+TAKE_PROFIT_RATIO = 0.05        # +5 % → sell (basic TP)
+STOP_LOSS_RATIO   = -0.025      # −2.5 % → sell (basic SL)
+TRAILING_ACTIVATE = 0.015       # Activate trailing stop when profit >= +1.5%
+TRAILING_DROP     = 0.015       # Sell if price drops 1.5% from the peak
 FEE_RATE          = 0.0005      # Upbit trading fee: 0.05 % per leg
 
 # ---------------------------------------------------------------------------
@@ -75,6 +77,7 @@ _shutdown_requested = False
 sim_krw       : float = SIM_START_KRW
 sim_holdings  : dict  = {}  # { ticker: units }
 sim_buy_prices: dict  = {}  # { ticker: buy_price }
+highest_prices: dict  = {}  # { ticker: highest_buy_price } for trailing stop
 
 # Trade history for final report
 trade_log: list = []  # list of dicts
@@ -141,6 +144,7 @@ def _execute_sell(ticker: str, current_price: float, profit_ratio: float, upbit=
         sim_krw += revenue
         sim_holdings[ticker]   = 0.0
         sim_buy_prices[ticker] = 0.0
+        if ticker in highest_prices: del highest_prices[ticker]
         msg = (
             f"[SELL] {ticker} @ {current_price:,.2f} KRW "
             f"({signal_type}) | P&L: {profit_ratio*100:+.2f}% | Cur KRW: {sim_krw:,.2f}"
@@ -152,6 +156,7 @@ def _execute_sell(ticker: str, current_price: float, profit_ratio: float, upbit=
     else:
         volume = upbit.get_balance(ticker)
         res = upbit.sell_market_order(ticker, volume)
+        if ticker in highest_prices: del highest_prices[ticker]
         logging.info(f"[REAL SELL] {ticker} ({signal_type}) → {res}")
         trade_log.append({"time": datetime.datetime.now(), "action": "SELL",
                           "ticker": ticker, "price": current_price,
@@ -228,29 +233,13 @@ def send_status_email(tickers: list, upbit=None):
     </style>
     """
 
-    # 1. Trade History Table
-    body += f"<h3>Trade History (Recent Log)</h3>"
-    if trade_log:
-        body += "<table>"
-        body += "<tr><th>#</th><th>Time</th><th>Action</th><th>Ticker</th><th>Price (KRW)</th><th>P&L / Units</th></tr>"
-        for i, t in enumerate(trade_log, 1):
-            time_str = str(t['time'])[:19]
-            price_str = f"{t['price']:,.2f}"
-            if t['action'] == "SELL":
-                pnl = f"{t.get('pnl_pct', 0):+.2f}%"
-            else:
-                pnl = f"{t.get('units', 0):.6f} u" if SIMULATION_MODE else "-"
-            body += f"<tr><td>{i}</td><td>{time_str}</td><td>{t['action']}</td><td>{t['ticker']}</td><td>{price_str}</td><td>{pnl}</td></tr>"
-        body += "</table>"
-    else:
-        body += "<p>No trades executed during this session.</p>"
-
-    # 2. Final Asset Calculation Table
-    body += f"<h3>Asset Summary</h3>"
+    # 1. Final Asset Calculation Table (Summarized First)
+    body += f"<h3>1. Asset Summary</h3>"
     body += "<table>"
     
+    total_asset_value = 0.0
     if SIMULATION_MODE:
-        total_asset = sim_krw
+        total_asset_value = sim_krw
         body += f"<tr><td><strong>Remaining Cash (KRW)</strong></td><td colspan='2'>{sim_krw:,.2f}</td></tr>"
         body += "<tr><th>Holding</th><th>Units</th><th>Current Value (KRW)</th></tr>"
         
@@ -259,14 +248,14 @@ def send_status_email(tickers: list, upbit=None):
                 price_data = get_current_prices_bulk([ticker])
                 cur_price  = price_data.get(ticker, 0)
                 value      = units * cur_price
-                total_asset += value
+                total_asset_value += value
                 body += f"<tr><td>{ticker}</td><td>{units:.6f} @ {cur_price:,.2f}</td><td>{value:,.2f}</td></tr>"
                 
-        pnl_total = total_asset - SIM_START_KRW
+        pnl_total = total_asset_value - SIM_START_KRW
         pnl_pct   = (pnl_total / SIM_START_KRW) * 100
         
         body += f"<tr><td><strong>Start Balance</strong></td><td colspan='2'>{SIM_START_KRW:,.2f}</td></tr>"
-        body += f"<tr><td><strong>Total Assets</strong></td><td colspan='2'>{total_asset:,.2f}</td></tr>"
+        body += f"<tr><td><strong>Total Assets</strong></td><td colspan='2'>{total_asset_value:,.2f}</td></tr>"
         color = "red" if pnl_total < 0 else "blue"
         body += f"<tr><td><strong>Total P&L</strong></td><td colspan='2' style='color:{color}'><b>{pnl_total:>+,.2f} ({pnl_pct:+.2f}%)</b></td></tr>"
     else:
@@ -291,11 +280,32 @@ def send_status_email(tickers: list, upbit=None):
                         total_estimated_krw += value
                         body += f"<tr><td>{ticker}</td><td>{units:.6f} @ {cur_price:,.2f}</td><td>{value:,.2f}</td></tr>"
             
+            total_asset_value = total_estimated_krw
             body += f"<tr><td><strong>Total Estimated Assets (KRW)</strong></td><td colspan='2'>{total_estimated_krw:,.2f}</td></tr>"
         except Exception as e:
             body += f"<tr><td colspan='3'>Error fetching real balances: {e}</td></tr>"
 
     body += "</table>"
+
+    # 2. Trade History Table (Last 24 Hours)
+    cutoff_time = datetime.datetime.now() - datetime.timedelta(hours=24)
+    recent_logs = [t for t in trade_log if t['time'] >= cutoff_time]
+    
+    body += f"<h3>2. Trade History (Last 24 Hours)</h3>"
+    if recent_logs:
+        body += "<table>"
+        body += "<tr><th>#</th><th>Time</th><th>Action</th><th>Ticker</th><th>Price (KRW)</th><th>P&L / Units</th></tr>"
+        for i, t in enumerate(recent_logs, 1):
+            time_str = str(t['time'])[:19]
+            price_str = f"{t['price']:,.2f}"
+            if t['action'] == "SELL":
+                pnl = f"{t.get('pnl_pct', 0):+.2f}%"
+            else:
+                pnl = f"{t.get('units', 0):.6f} u" if SIMULATION_MODE else "-"
+            body += f"<tr><td>{i}</td><td>{time_str}</td><td>{t['action']}</td><td>{t['ticker']}</td><td>{price_str}</td><td>{pnl}</td></tr>"
+        body += "</table>"
+    else:
+        body += "<p>No trades executed in the last 24 hours.</p>"
 
     msg = MIMEMultipart()
     msg['From'] = EMAIL_USER
@@ -342,17 +352,22 @@ def trading_cycle(tickers: list, ticker_params: dict, upbit=None):
 
             if not is_holding:
                 # ── BUY SIGNAL CHECK ─────────────────────────────────────
-                df = get_ohlcv_safe(ticker, ma_window + 1)
-                if df is None or len(df) < 2:
+                # To calculate MA 20 we need at least 21 items
+                lookback_req = max(ma_window, 20) + 1
+                df = get_ohlcv_safe(ticker, lookback_req)
+                if df is None or len(df) < 20:
                     continue
 
                 ma_val     = df["close"].rolling(window=ma_window).mean().iloc[-2]
+                ma20_val   = df["close"].rolling(window=20).mean().iloc[-2]
                 prev_day   = df.iloc[-2]
                 today_open = df.iloc[-1]["open"]
                 target     = today_open + (prev_day["high"] - prev_day["low"]) * k
 
-                if current_price >= target and today_open > ma_val:
+                # Uptrend condition: Price touches target, and open is above both short MA and long MA(20)
+                if current_price >= target and today_open > ma_val and today_open > ma20_val:
                     _execute_buy(ticker, current_price, upbit)
+                    highest_prices[ticker] = current_price
 
             else:
                 # ── SELL SIGNAL CHECK ─────────────────────────────────────
@@ -364,8 +379,22 @@ def trading_cycle(tickers: list, ticker_params: dict, upbit=None):
                 if buy_price <= 0:
                     continue
 
+                # Trailing Stop Tracker Update
+                peak_price = highest_prices.get(ticker, buy_price)
+                if current_price > peak_price:
+                    highest_prices[ticker] = current_price
+                    peak_price = current_price
+
                 profit_ratio = (current_price - buy_price) / buy_price
-                if profit_ratio >= TAKE_PROFIT_RATIO or profit_ratio <= STOP_LOSS_RATIO:
+                drop_from_peak = (peak_price - current_price) / peak_price if peak_price > 0 else 0
+
+                # Determine if sell is triggered
+                # 1) Take Profit (hard limit) or
+                # 2) Stop Loss (hard limit) or
+                # 3) Trailing Stop (activated after a certain profit threshold, drops by TRAILING_DROP)
+                triggered_trailing = profit_ratio >= TRAILING_ACTIVATE and drop_from_peak >= TRAILING_DROP
+
+                if profit_ratio >= TAKE_PROFIT_RATIO or profit_ratio <= STOP_LOSS_RATIO or triggered_trailing:
                     _execute_sell(ticker, current_price, profit_ratio, upbit)
 
 
@@ -392,10 +421,10 @@ def main():
 
     sim_krw = SIM_START_KRW
 
-    # ── Step 1 : Fetch top-100 tickers ───────────────────────────────────
-    logging.info(f"Fetching top {TICKER_LIMIT} tickers by 24h volume...")
-    tickers = get_top_volume_tickers(TICKER_LIMIT)
-    logging.info(f"→ {len(tickers)} tickers selected.  Top-5: {tickers[:5]}")
+    # ── Step 1 : Fetch top target tickers ───────────────────────────────
+    logging.info(f"Fetching Top {TICKER_LIMIT} Volume and Top {TICKER_LIMIT} Gain tickers...")
+    tickers = get_target_tickers(TICKER_LIMIT)
+    logging.info(f"→ {len(tickers)} unique tickers selected.  Top-5: {tickers[:5]}")
 
     sim_holdings   = {t: 0.0 for t in tickers}
     sim_buy_prices = {t: 0.0 for t in tickers}
@@ -423,7 +452,7 @@ def main():
             hours_since_train = (now - last_train_dt).total_seconds() / 3600
             if hours_since_train >= RETRAIN_HOURS:
                 logging.info(f"⏰ {RETRAIN_HOURS}h elapsed – refreshing tickers & re-optimising...")
-                tickers        = get_top_volume_tickers(TICKER_LIMIT)
+                tickers        = get_target_tickers(TICKER_LIMIT)
                 ticker_params  = build_ticker_params(tickers, TRAIN_DAYS)
                 # Extend holdings dicts for any newly-added tickers
                 for t in tickers:

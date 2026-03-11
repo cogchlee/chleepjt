@@ -4,7 +4,7 @@ trade_utils.py
 Utility functions for the Upbit Auto Trading Bot.
 
 Responsibilities:
-  - Fetch top-volume tickers from market
+  - Fetch top-volume and top-gain tickers from market
   - Retrieve current prices in bulk
   - Calculate optimized K value and MA window per ticker using historical backtest
 """
@@ -26,10 +26,11 @@ except ImportError:
 # Market Data
 # ---------------------------------------------------------------------------
 
-def get_top_volume_tickers(limit: int = 100) -> list:
+def get_target_tickers(limit_each: int = 10) -> list:
     """
-    Fetch tickers from KRW market, sorted by 24h trading volume descending.
-    Returns up to `limit` ticker symbols.
+    Fetch tickers from KRW market.
+    Select Top N by 24h trading volume + Top N by 24h signed change rate.
+    Returns a unique list of up to (limit_each * 2) ticker symbols.
     """
     if not pyupbit:
         return []
@@ -46,15 +47,32 @@ def get_top_volume_tickers(limit: int = 100) -> list:
                 all_ticker_data.extend(resp.json())
             time.sleep(0.1)  # Respect Upbit API rate limits
 
-        sorted_tickers = sorted(
+        # Top by 24h volume
+        sorted_by_vol = sorted(
             all_ticker_data,
             key=lambda x: x.get("acc_trade_price_24h", 0),
             reverse=True,
         )
-        return [t["market"] for t in sorted_tickers[:limit]]
+        top_vol = [t["market"] for t in sorted_by_vol[:limit_each]]
+
+        # Top by 24h gain (signed_change_rate)
+        sorted_by_gain = sorted(
+            all_ticker_data,
+            key=lambda x: x.get("signed_change_rate", 0),
+            reverse=True,
+        )
+        top_gain = [t["market"] for t in sorted_by_gain[:limit_each]]
+
+        # Combine and remove duplicates while preserving order
+        combined = []
+        for t in top_vol + top_gain:
+            if t not in combined:
+                combined.append(t)
+        
+        return combined
 
     except Exception as e:
-        logging.error(f"[get_top_volume_tickers] {e}")
+        logging.error(f"[get_target_tickers] {e}")
         return []
 
 
