@@ -8,8 +8,7 @@ Automated Lottery Analysis and Prediction Bot.
 
 ## Automation Setup
 The bot utilizes `PM2` to run a 24/7 background scheduler.
-- **Sundays at 00:00**: Fetches the newest lottery draws and retrains the predictions.
-- **Daily at 06:00, 13:00, 19:00**: Dispatches Triple Luck recommendation emails.
+- **Daily at 06:00, 13:00, 19:00**: Dispatches a combined report email comprising of optimized Lotto 6/45 numbers (5 games), Pension 720+ sequences (5 games), and Triple Luck timing recommendations.
 
 ## Configuration
 Requires a `.env` file at the root of this folder containing:
