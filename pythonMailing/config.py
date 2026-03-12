@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# SMTP Configuration
+# Global SMTP Configuration (Fallback Default: Gmail)
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "")
@@ -33,6 +33,8 @@ CAT2_SCHEDULE_TYPE = os.getenv("CAT2_SCHEDULE_TYPE", "once_daily")
 
 # Category 2 Configuration
 # CAT1 and CAT2 configurations operate independently.
+CAT2_SMTP_SERVER = os.getenv("CAT2_SMTP_SERVER", "smtp.gmail.com")
+CAT2_SMTP_PORT = int(os.getenv("CAT2_SMTP_PORT", 587))
 CAT2_SENDER_EMAIL = os.getenv("CAT2_SENDER_EMAIL", "")
 CAT2_SENDER_PASSWORD = os.getenv("CAT2_SENDER_PASSWORD", "")
 CAT2_RECEIVER_EMAIL = os.getenv("CAT2_RECEIVER_EMAIL", "")
@@ -46,6 +48,8 @@ CATEGORIES = [
         "email_subject_prefix": "[Share] Daily AI & ML News Auto Mailing",
         "schedule_type": SCHEDULE_TYPE,
         "credentials": {
+            "SMTP_SERVER": SMTP_SERVER,
+            "SMTP_PORT": SMTP_PORT,
             "SENDER_EMAIL": SENDER_EMAIL,
             "SENDER_PASSWORD": SENDER_PASSWORD,
             "RECEIVER_EMAIL": RECEIVER_EMAIL,
@@ -89,6 +93,8 @@ CATEGORIES = [
         "email_subject_prefix": "[Share] Daily Education & Literacy News",
         "schedule_type": CAT2_SCHEDULE_TYPE,
         "credentials": {
+            "SMTP_SERVER": CAT2_SMTP_SERVER,
+            "SMTP_PORT": CAT2_SMTP_PORT,
             "SENDER_EMAIL": CAT2_SENDER_EMAIL,
             "SENDER_PASSWORD": CAT2_SENDER_PASSWORD,
             "RECEIVER_EMAIL": CAT2_RECEIVER_EMAIL,

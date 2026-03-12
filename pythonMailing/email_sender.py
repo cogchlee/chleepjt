@@ -88,6 +88,8 @@ def send_email(subject, news_items, credentials, header_title=None):
     Formats the news and sends an email via SMTP.
     Returns True if successful, False otherwise.
     """
+    smtp_server = credentials.get("SMTP_SERVER", config.SMTP_SERVER)
+    smtp_port = int(credentials.get("SMTP_PORT", config.SMTP_PORT))
     sender_email = credentials.get("SENDER_EMAIL")
     sender_password = credentials.get("SENDER_PASSWORD")
     receiver_email = credentials.get("RECEIVER_EMAIL")
@@ -127,9 +129,15 @@ def send_email(subject, news_items, credentials, header_title=None):
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
         
-        logger.info(f"Connecting to SMTP server {config.SMTP_SERVER}:{config.SMTP_PORT}...")
-        server = smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10)
-        server.starttls()  # Secure the connection
+        logger.info(f"Connecting to SMTP server {smtp_server}:{smtp_port}...")
+        
+        # LG corporate servers / Outlook often use 587 with STARTTLS or 465 with SSL.
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port, timeout=15)
+            server.starttls()  # Secure the connection
+            
         server.login(sender_email, sender_password)
         
         logger.info(f"Sending email to {', '.join(recipients)}...")
