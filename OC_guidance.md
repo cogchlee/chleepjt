@@ -78,12 +78,13 @@ pm2 start ./venv/bin/python --name "MailingSystem" -- -u pythonMailing/main.py
 pm2 start ./venv/bin/python --name "TradeSys" -- -u tradeProject/main.py
 ```
 
-### [중요] 03. Auto Lottery Prediction System (dhlotteryCheck)
-이 시스템은 매주 `로또 6/45`와 `연금복권 720` 알고리즘 분석값을 돌리고, 매일 3회 `트리플럭` 전자복권의 최적 구매 시점을 예측하여 이메일로 전송합니다.
+### [중요] 03. YouTube Personal Agent (autoComment)
+이 시스템은 Gemini Pro를 활용하여 타겟 유튜브 채널의 콘텐츠를 분석하고, 사용자의 정체성이 담긴 댓글 초안을 생성한 뒤 텔레그램을 통해 승인을 받아 자동 게시하는 에이전트입니다.
 
-`chleepjt` 디렉토리 최상위 경로에서 동일한 가상환경(`venv`)을 사용하여 PM2 데몬을 띄웁니다:
+`chleepjt` 디렉토리 최상위 경로에서 동일한 가상환경(`venv`)을 사용하여 동작 기반을 세팅할 예정입니다 (개발 진행에 따라 안내 업데이트).
 ```bash
-pm2 start ./venv/bin/python --name "LotteryCheck" -- dhlotteryCheck/main.py
+# 추후 봇 백그라운드 구동 명령어 배치 예정
+# pm2 start ./venv/bin/python --name "AutoComment" -- autoComment/main.py
 ```
 
 ---
