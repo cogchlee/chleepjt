@@ -1,0 +1,16 @@
+오라클 클라우드 주소
+158.180.73.241 (Ephemeral)
+MyOracleCloud
+name : ubuntu
+pw : lgeuser123
+
+
+내부 IP : 192.168.219.107
+외부 IP : 116.47.207.201
+(3/5일자 확인)
+
+Access Key
+MokvezDSxLcaxxNcNeBpPS8ULVt1jsySkZbxePU5
+
+Secret Key
+aA7s1a6WEO9hfmw3x2HBxbBJI81J7rZBjdmTlxOP

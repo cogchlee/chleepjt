@@ -11,7 +11,7 @@
 | --- | ------------------------------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 01  | [Mailing System](./pythonMailing/)    | Python           | ✅ Active         | AI, ML, Education & Literacy News Auto Collection and Auth Mailing System (AI, ML, 교육/문해력 뉴스 자동 수집 및 이메일 발송 시스템) |
 | 02  | [Upbit Auto Trading](./tradeProject/) | Python           | ✅ Active         | Upbit API Auto Trading Bot with Simulation Mode (업비트 가상자산 자동매매 및 모의투자 봇)                                            |
-| 03  | [YouTube Personal Agent](./autoComment/)     | Python           | ✅ Active         | YouTube auto-comment agent using Gemini Pro to generate bilingual responses (Gemini 기반 유튜브 인공지능 자동 댓글 봇)                 |
+| 03  | [YouTube Personal Agent](./youtube_agent/)     | Python           | ✅ Active         | YouTube auto-comment agent using Gemini Pro to generate bilingual responses (Gemini 기반 유튜브 인공지능 자동 댓글 봇)                 |
 
 ---
 
@@ -32,7 +32,15 @@ Project/
 │   ├── test_simulate.py    #   Simulation logic test script (모의투자 테스트 스크립트)
 │   ├── .env.example        #   Environment variables template (환경변수 템플릿)
 │   └── README.md           #   Project detail docs (프로젝트 상세 설명)
-├── autoComment/            # 03. YouTube Personal Agent
+├── youtube_agent/          # 03. YouTube Personal Agent
+│   ├── main.py             #   Integrated entry point with scheduler (통합 진입점 및 스케줄러)
+│   ├── config.py           #   Environment variables & settings (환경 변수 설정)
+│   ├── auth/               #   YouTube OAuth 2.0 module (유튜브 인증 모듈)
+│   ├── ai/                 #   Gemini Pro prompt & generation module (Gemini 댓글 생성 모듈)
+│   ├── telegram_bot/       #   Human-in-the-Loop approval bot (승인용 텔레그램 봇)
+│   ├── youtube/            #   YouTube API & Selenium crawler (유튜브 수집기 및 크롤러)
+│   ├── scheduler/          #   Automated cycle scheduler (자동화 스케줄러)
+│   ├── db/                 #   SQLite schema & manager (SQLite DB 관리)
 │   └── readme.md           #   Project detail docs (프로젝트 상세 설명)
 ├── README.md               # Repository overview (전체 저장소 소개 / 현재 파일)
 └── .gitignore
@@ -63,10 +71,11 @@ python main.py
 
 ### 03. YouTube Personal Agent
 ```bash
-cd autoComment
-# Install dependencies as outlined in readme.md
-# Set up OAuth tokens and .env variables
-# python main.py (entry point once fully developed)
+cd youtube_agent
+pip install -r requirements.txt
+# Set up OAuth tokens (token.json) and .env variables
+python auth/oauth.py  # First-time authentication
+python main.py        # Start the Agent & Telegram Bot
 ```
 
 ---
