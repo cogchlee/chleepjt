@@ -30,11 +30,7 @@ def format_news_html(news_items, header_title):
           
           .news-date {{ font-size: 13px; color: #8B95A1; margin-bottom: 16px; font-weight: 500; display: inline-block; background-color: #333D4B; padding: 4px 8px; border-radius: 6px; }}
           
-          .dual-summary {{ background-color: #191F28; padding: 18px; border-radius: 12px; font-size: 15px; color: #D1D6DB; line-height: 1.6; letter-spacing: -0.2px; }}
-          .summary-en {{ margin-bottom: 16px; word-break: keep-all; }}
-          .summary-ko {{ color: #8B95A1; border-top: 1px solid #333D4B; padding-top: 16px; word-break: keep-all; }}
-          
-          .button-container {{ margin-top: 24px; text-align: right; }}
+          .button-container {{ margin-top: 10px; text-align: right; }}
           .news-link {{ display: inline-block; padding: 12px 24px; background-color: #3182F6; color: #ffffff !important; text-decoration: none; border-radius: 12px; font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }}
         </style>
       </head>
@@ -65,10 +61,6 @@ def format_news_html(news_items, header_title):
                         <div class="news-title-ko">{item['title_ko']}</div>
                     </div>
                     <div class="news-date">Published: {item['published_date']}</div>
-                    <div class="dual-summary">
-                        <div class="summary-en">{item['summary_en']}</div>
-                        <div class="summary-ko">{item['summary_ko']}</div>
-                    </div>
                     <div class="button-container">
                         <a class="news-link" href="{item['link']}" target="_blank">Read Full Article</a>
                     </div>

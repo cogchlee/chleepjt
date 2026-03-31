@@ -9,6 +9,9 @@ beautifulsoup4
 
 # Translation
 googletrans==4.0.0-rc1
+httpx==0.13.3
+httpcore==0.9.1
+chardet==3.0.4
 
 # Scheduling & environment
 schedule

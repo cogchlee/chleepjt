@@ -42,8 +42,8 @@ def setup_schedule():
     """
     Sets up the scheduler based on category schedules:
       - 'Xm'          : Run every X minutes  (e.g. '10m', '30m')
-      - 'twice_daily' : Run at 08:00 and 16:00 KST
-      - 'once_daily'  : Run at 08:00 KST only
+      - 'twice_daily' : Run at 09:00 and 16:00 KST
+      - 'once_daily'  : Run at 09:00 KST only
     Falls back to 'once_daily' if value is unrecognized.
     """
     active_cats = config.get_active_categories()
@@ -67,15 +67,15 @@ def setup_schedule():
                 schedule_type = 'once_daily'
 
         if schedule_type == 'twice_daily':
-            logger.info(f"Scheduling runs at 08:00 AM and 04:00 PM KST for {cat_name}.")
-            schedule.every().day.at("08:00").do(job_for_category, category)
+            logger.info(f"Scheduling runs at 09:00 AM and 04:00 PM KST for {cat_name}.")
+            schedule.every().day.at("09:00").do(job_for_category, category)
             schedule.every().day.at("16:00").do(job_for_category, category)
         else:
             if schedule_type != 'once_daily':
-                logger.warning(f"Unknown SCHEDULE_TYPE '{schedule_type}' for {cat_name}. Defaulting to once_daily (08:00 KST).")
+                logger.warning(f"Unknown SCHEDULE_TYPE '{schedule_type}' for {cat_name}. Defaulting to once_daily (09:00 KST).")
             else:
-                logger.info(f"Scheduling one daily run at 08:00 AM KST for {cat_name}.")
-            schedule.every().day.at("08:00").do(job_for_category, category)
+                logger.info(f"Scheduling one daily run at 09:00 AM KST for {cat_name}.")
+            schedule.every().day.at("09:00").do(job_for_category, category)
 
 def main():
     """Main function that initializes and runs the scheduler."""

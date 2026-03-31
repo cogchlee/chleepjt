@@ -1,297 +1,142 @@
-# AI News Automated Mailing System / 자동화된 AI 뉴스 메일링 시스템
+# 🚀 프로젝트명: AI News Automated Mailing System
 
-이 시스템은 AI 에이전트, 머신러닝, 컴퓨터 비전 관련 뉴스뿐만 아니라, **유아 교육 및 문해력(Education & Literacy)** 등 다중 카테고리 기사를 자동으로 수집하여 정해진 독립적인 스케줄에 맞춰 이메일로 발송합니다.
+## 1. 프로젝트 목적 및 주요 기능
+### 1.1 개발 목적
+* **다중 카테고리 정보 집약**: AI 기술 동향(CAT1)과 유아 교육/문해력(CAT2) 뉴스를 자동 수집하여 정보 습득 효율성 극대화.
+* **지능형 큐레이션**: 정보 과잉 시대에 중요도 기반 스코어링을 통해 고품질의 뉴스만 선별하여 개인 이메일로 전달.
 
----
-
-## 📋 목차
-- [주요 구성 요소](#주요-구성-요소)
-- [설치 및 실행](#설치-및-실행)
-- [개선 사항](#개선-사항)
-- [로깅 및 모니터링](#로깅-및-모니터링)
-- [테스트](#테스트)
-- [문제 해결](#문제-해결)
-
----
-
-## 주요 구성 요소
-
-### Configuration (설정)
-#### `config.py` & `.env`
-- SMTP 및 이메일 주소 등 민감한 정보를 환경 변수로 관리합니다.
-- **자동 설정 검증**: 필수 설정값 누락 시 import 시점에 경고 메시지 출력
-- **로깅 설정**: `LOG_LEVEL` 환경 변수로 로깅 레벨 조절 가능
-
-```python
-# 필수 환경 변수 (카테고리 1: AI & ML)
-SENDER_EMAIL          # 발송자 이메일
-SENDER_PASSWORD       # 발송자 비밀번호
-RECEIVER_EMAIL        # 수신자 이메일
-FORWARD_EMAIL         # (선택) 전달 주소 ("NONE" 입력 시 및 한국 시간 주말(토/일)에는 발송 생략)
-
-# 선택 환경 변수 (카테고리 2: Education & Literacy)
-CAT2_SENDER_EMAIL     # 미입력 시 SENDER_EMAIL 로 폴백
-CAT2_SENDER_PASSWORD  # 미입력 시 SENDER_PASSWORD 로 폴백 
-CAT2_RECEIVER_EMAIL   # 미입력 시 RECEIVER_EMAIL 로 폴백
-CAT2_FORWARD_EMAIL    # 미입력 시 FORWARD_EMAIL 로 폴백
-
-# 스케줄 설정
-SCHEDULE_TYPE         # Category 1 실행 스케줄 (기본값: once_daily)
-CAT2_SCHEDULE_TYPE    # Category 2 실행 스케줄 (기본값: once_daily)
-LOG_LEVEL             # "DEBUG", "INFO", "WARNING", "ERROR" (기본값: INFO)
-```
-
-### News Fetching (뉴스 수집)
-#### `news_fetcher.py`
-**주요 기능:**
-- ✅ **다중 카테고리 지원**: AI & ML (4개 토픽) 및 Education & Literacy (2개 토픽) 독립 수집
-- ✅ 주제당 최대 풀에서 최상위 중요도 기사 추출
-- ✅ 제목, 링크, 발행일, 핵심 요약 데이터 수집
-- ✅ **중요도 랭킹**: 카테고리별 맞춤 키워드(기술/동향, 교육/문해력) 기반 스코어링
-- ✅ **연속적인 필터링**: 중복 기사 발송 방지를 위한 `sent_links.json` 기반 **주간(일요일) 초기화** 적용
-- ✅ **URL 유효성 검사**: HTTPS Connection, 403 Forbidden 시 RSS 요약본으로 대체
-- ✅ **자동 번역**: 영문 → 한글 (Google Translate API)
-- ✅ **강화된 에러 처리**: 크롤링 차단 시 깔끔한 Fallback 메커니즘 제공
-
-**개선된 에러 처리:**
-```python
-# 네트워크 타임아웃 처리
-requests.exceptions.Timeout
-
-# 연결 에러 처리  
-requests.exceptions.ConnectionError
-
-# JSON 파싱 에러 처리
-json.JSONDecodeError
-
-# 피드 파싱 에러 처리
-feedparser 예외 처리
-```
-
-### Email Sending (이메일 발송)
-#### `email_sender.py`
-- 추출된 뉴스를 깔끔한 **Toss 스타일 다크 모드 HTML** 형식으로 포맷팅
-- 모서리가 둥근 세련된 UI, 시그니처 블루 액센트 적용
-- 영문 / 한글 이중 제목 및 요약 (본문 제목과 날짜 분리 UI)
-- 수신자 및 전달 주소(`FORWARD_EMAIL`)로 발송 (단, "NONE"으로 설정하거나 한국 시간 기준 주말인 경우 Forward 발송 생략)
-- **강화된 SMTP 예외 처리**: 인증 실패 시 로깅 보강
-
-### Main Orchestration (메인 오케스트레이션)
-#### `main.py`
-- 데이터 수집과 메일 발송을 통합하는 진입점
-- 스케줄링 기능 (schedule 라이브러리 기반)
-- **상세한 로깅**: 작업 시작/완료 시간, 처리 결과 기록
-- **예외 처리**: 작업 실패 시 스택 트레이스 기록
+### 1.2 주요 기능
+* **독립적 다중 파이프라인**: CAT1(AI/ML)과 CAT2(Education)를 각각 독립적인 발송자/수신자 및 스케줄로 관리.
+* **지능형 뉴스 랭킹**: 맞춤형 키워드 기반 스코어링 시스템을 통해 최상위 중요도 기사 우선 추출.
+* **글로벌 뉴스 번역**: 영문 기사를 자동으로 감지하여 한글로 번역(Google Translate) 후 병기 발송.
+* **세련된 UI/UX**: Toss 스타일의 다크 모드 HTML 포맷팅과 시그니처 블루 액센트를 적용한 고품질 메일 본문.
 
 ---
 
-## 설치 및 실행
+## 2. 뉴스 수집 소스 
 
-### 1️⃣ 사전 요구사항
-Python 3.8+ 설치 필수
+### 2.1 Category 1: AI & ML
+CAT1은 다음의 전문 매체 및 커뮤니티를 우선적으로 탐색하여 뉴스를 수집합니다.
 
-### 2️⃣ 의존성 설치
-```bash
-pip install -r requirements.txt
-```
+1.  **[AI 타임스](https://www.aitimes.com/)**: 국내외 AI 전문 뉴스
+2.  **[로봇신문](https://www.irobotnews.com/)**: 로봇 및 Physical AI 동향
+3.  **[테크M](https://www.techm.kr/)**: IT 산업 및 빅테크 전략
+4.  **[디지털데일리](https://www.ddaily.co.kr/)**: IT 인프라 및 엔터프라이즈 소식
+5.  **[GeekNews (Hada)](https://news.hada.io/)**: 개발자 중심 기술 큐레이션
+6.  **[PyTorch KR](https://pytorch.kr/)**: 파이토치 생태계 및 라이브러리 소식
+7.  **[OKKY](https://okky.kr/)**: 국내 최대 개발자 커뮤니티
+8.  **[TensorFlow Blog](https://tensorflow.blog/)**: 텐서플로우 관련 기술 포스트
+9.  **그 외 Google 검색**: 위 소스 외 보완을 위한 키워드 기반 검색
 
-### 3️⃣ 환경 설정
-프로젝트 루트 디렉토리에 `.env` 파일 생성:
+### 2.2 Category 2: Education & Literacy
+CAT2는 다음의 전문 매체 및 커뮤니티를 우선적으로 탐색하여 뉴스를 수집합니다.
+
+1.  **[교육부](https://www.moe.go.kr/)**: 교육 정책 및 뉴스
+2.  **[한국교육학술정보원](https://www.keris.or.kr/)**: 교육 정보 및 연구 자료
+3.  **[EBS 교육뉴스](https://news.ebs.co.kr/)**: 교육 관련 뉴스
+4.  **[한국교원단체총연합회](https://www.ktwu.or.kr/)**: 교원 관련 소식
+5.  **[학부모뉴스24](https://www.parentsnews.co.kr/)**: 학부모 대상 교육 정보
+6.  **[교육과정평가원](https://www.kice.re.kr/)**: 교육 과정 및 평가 정보
+7.  **[한국교육개발원](https://www.kedi.re.kr/)**: 교육 연구 및 정책
+8.  **[그 외 Google 검색**: 위 소스 외 보완을 위한 키워드 기반 검색
+
+---
+
+## 3. 설정 및 환경 구축 (Configuration)
+
+### 3.1 상세 설정 모듈 (`config.py` & `.env`)
+민감한 정보는 환경 변수로 관리하며, 시스템 시작 시 자동 검증을 수행합니다. 필수 설정값 누락 시 import 시점에 경고 메시지를 출력합니다.
+
+| 카테고리         | 변수명                 | 설명                                                        |
+| :--------------- | :--------------------- | :---------------------------------------------------------- |
+| **공통**         | `LOG_LEVEL`            | "DEBUG", "INFO", "WARNING", "ERROR" (기본값: INFO)          |
+| **CAT1 (AI/ML)** | `SENDER_EMAIL`         | 발송자 이메일 주소                                          |
+|                  | `SENDER_PASSWORD`      | 발송자 비밀번호 (Gmail 앱 비밀번호)                         |
+|                  | `RECEIVER_EMAIL`       | 수신자 이메일 주소                                          |
+|                  | `FORWARD_EMAIL`        | (선택) 전달 주소 ("NONE" 혹은 한국 시간 주말에는 발송 생략) |
+|                  | `SCHEDULE_TYPE`        | CAT1 실행 주기 (예: `once_daily`, `10m`, `30m`)             |
+| **CAT2 (Edu)**   | `CAT2_SENDER_EMAIL`    | CAT2 전용 발송자 이메일 주소 (CAT1과 독립적으로 동작)       |
+|                  | `CAT2_SENDER_PASSWORD` | CAT2 전용 발송자 비밀번호                           |
+|                  | `CAT2_RECEIVER_EMAIL`  | CAT2 전용 수신자 이메일                             |
+|                  | `CAT2_FORWARD_EMAIL`   | CAT2 전용 전달 주소                                 |
+|                  | `CAT2_SCHEDULE_TYPE`   | CAT2 실행 주기 (기본값: `once_daily`)               |
+
+### 3.2 환경 설정 (`.env` 파일 생성)
+프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 아래 내용을 입력합니다.
 
 ```env
 # Gmail SMTP 설정 (Gmail App Password 필요)
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SENDER_EMAIL=your_email@gmail.com
-SENDER_PASSWORD=your_app_password
+SENDER_PASSWORD=your_app_password_16_digits
 
 # 수신자 설정
 RECEIVER_EMAIL=receiver@gmail.com
 FORWARD_EMAIL=optional_forwarding@example.com
 
-# 스케줄 타입
-SCHEDULE_TYPE=once_daily  # once_daily, twice_daily, 또는 "10m", "30m" 등
+# 스케줄 타입 (once_daily, twice_daily, 또는 "10m", "30m" 등)
+SCHEDULE_TYPE=once_daily
+CAT2_SCHEDULE_TYPE=once_daily
 
-# 로깅 레벨 (선택사항)
-LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+# 로깅 레벨 (선택사항: DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
 ```
 
-**Gmail App Password 생성 방법:**
-1. Google 계정의 보안 설정 접속
-2. "앱 비밀번호" 활성화
-3. 생성된 16자리 비밀번호를 `SENDER_PASSWORD` (및 필요 시 `CAT2_SENDER_PASSWORD`)에 입력
-
-### 4️⃣ 실행
-```bash
-python main.py
-```
-
-실행 시:
-- 즉시 첫 번째 뉴스 발송
-- 설정된 스케줄에 따라 반복 실행
-- `Ctrl+C`로 중단
+### 3.3 Gmail 앱 비밀번호 생성 방법
+1. **Google 계정 보안 설정** 접속
+2. **"앱 비밀번호"** 검색 및 활성화 (2단계 인증 필요)
+3. 앱 이름을 지정하고 생성된 **16자리 비밀번호**를 복사
+4. `.env` 파일의 `SENDER_PASSWORD` (필요 시 `CAT2_SENDER_PASSWORD`)에 입력
 
 ---
 
-## 개선 사항
-
-### ✅ 완료된 개선 사항
-
-#### 1. **강화된 에러 처리 (Error Handling)**
-- 모든 주요 함수에 try-except 블록 추가
-- 네트워크 에러, 타임아웃, 파싱 에러 분류 처리
-- SMTP 인증 실패 시 명확한 에러 메시지
-
-#### 2. **상세한 로깅 (Logging)**
-- logging 모듈 통합
-- 파일 기반 로깅: `ai_news_mailing.log`
-- 콘솔 + 파일 동시 출력
-- 로깅 레벨 조절 가능 (환경 변수: LOG_LEVEL)
-
-**예시:**
-```
-2026-02-26 10:30:45,123 - news_fetcher - INFO - Fetching news for topic: AI Agent, AI Tool, AI Assistant
-2026-02-26 10:30:45,456 - news_fetcher - DEBUG - Checking link validity: https://example.com
-2026-02-26 10:30:46,789 - email_sender - INFO - Sending email to receiver@gmail.com
-```
-
-#### 3. **설정 검증 (Configuration Validation)**
-- config.py에서 필수 설정값 자동 검증
-- 누락된 설정값 시 명확한 에러 메시지
-- import 시점에 검증 실행
-
-#### 4. **한/영 이중 언어 지원**
-- 한국어 RSS 피드 우선 수집, 부족 시 영어 피드 보완
-- 기사 언어 자동 감지 후 양방향 번역 (KO↔EN)
-
-#### 5. **고도화된 다중 카테고리 파이프라인**
-- 하나의 Python 스크립트로 여러 개의 뉴스 카테고리 관리 가능
-- 카테고리별 독립적인 이메일 발송자/수신자 및 스케줄링 간격(`CAT2_SCHEDULE_TYPE`) 지정
-
-#### 6. **효율적인 기사 중복 방지 (Deduplication)**
-- 이미 발송된 URL은 `sent_links.json`에 저장하여 중복 발송 차단
-- 트래커는 매주 일요일 자정에 자동 초기화됨
+## 4. 기술 스택 및 개발 환경
+* **언어**: Python 3.8+
+* **News Engine**: `feedparser`, `newspaper3k`, `googlenewsdecoder`
+* **Translation**: `googletrans` (4.0.0-rc1)
+* **Automation**: `schedule`
+* **Mailing**: `smtplib`, `email.mime` (SMTP 기반)
+* **Formatting**: `beautifulsoup4`, `lxml_html_clean`
+* **Configuration**: `python-dotenv`
 
 ---
 
-## 로깅 및 모니터링
+## 5. 구현 로직 (Implementation Logic)
 
-### 로그 파일 위치
-`pythonMailing/ai_news_mailing.log` (스크립트 실행 위치와 무관하게 `pythonMailing` 디렉토리 내에 안정적으로 생성됨)
+### 5.1 뉴스 수집 및 스코어링 (News Fetching)
+* **주제별 수집**: 주제당 설정된 최대 풀에서 키워드 가중치를 계산하여 기사 추출.
+* **유효성 검사**: HTTPS 연결 확인 및 403 에러 발생 시 RSS 요약본으로 대체하는 Fallback 메커니즘.
 
-### 로그 레벨별 정보
+### 5.2 중복 방지 시스템 (Deduplication)
+* **트래커 운용**: `sent_links.json` 파일을 통해 이미 발송된 URL 기록.
+* **주간 초기화**: 매주 일요일 자정에 트래커를 자동 초기화하여 신선도 유지.
 
-| 레벨    | 용도             | 예시                             |
-| ------- | ---------------- | -------------------------------- |
-| DEBUG   | 상세 디버깅 정보 | 링크 유효성 검사 결과            |
-| INFO    | 일반 실행 정보   | 뉴스 수집 완료, 이메일 발송 성공 |
-| WARNING | 경고 메시지      | 설정값 누락, 번역 실패           |
-| ERROR   | 에러 메시지      | 네트워크 오류, SMTP 실패         |
+### 5.3 이메일 렌더링 및 발송 (Email Rendering)
+* **다크 모드 HTML**: 모서리가 둥근 컨테이너와 가독성 높은 폰트 설정.
+* **이중 언어 지원**: 한/영 이중 제목 제공 및 원문 링크 직접 이동 기능 (본문 요약 제외로 피로도 최소화).
+* **전달 로직**: 설정된 수신자 외에 전달 주소(`FORWARD_EMAIL`) 지원 (단, 주말 발송은 제외).
 
-### 로깅 레벨 변경
-```bash
-# 디버깅 모드
-LOG_LEVEL=DEBUG python main.py
-
-# 일반 모드 (기본)
-LOG_LEVEL=INFO python main.py
-```
+### 5.4 로깅 및 모니터링 (Logging)
+* **상태 기록**: `ai_news_mailing.log`에 작업 시작, 완료, 처리 결과 및 에러 스택 트레이스 상세 기록.
+* **레벨 제어**: 환경 변수(`LOG_LEVEL`)를 통해 DEBUG부터 ERROR까지 로깅 강도 조절 가능.
 
 ---
 
-## 테스트
+## 6. 운영 및 예외 처리 (Operations & Error Handling)
 
-### 모든 테스트 실행
-```bash
-python -m unittest discover -s . -p "test_*.py"
-```
+### 6.1 상세 스케줄링 및 자동화 정책
+* **자유로운 실행 주기**: `once_daily`, `twice_daily` 또는 세밀한 분 단위(`10m`, `30m`) 스케줄링을 완벽하게 지원합니다.
+* **주말 발송 스마트 제어**: 한국 시간(KST) 기준 주말(토/일)에는 설정된 전달 이메일(`FORWARD_EMAIL`) 발송을 자동으로 생략하여 주말 업무 방해를 줄입니다.
+* **시작 전 자동 검증**: 시스템 구동 시 `config.py`에서 필수 환경 변수 누락 여부를 즉시 검사하여 오작동을 미연에 방지합니다.
 
-### 특정 테스트 실행
-```bash
-# news_fetcher 테스트만
-python -m unittest test_news_fetcher
-
-# email_sender 테스트만
-python -m unittest test_email_sender
-
-# 특정 테스트 메서드
-python -m unittest test_news_fetcher.TestSentLinksHandling.test_get_sent_links_empty
-```
-
-### 테스트 커버리지
-```bash
-pip install coverage
-coverage run -m unittest discover
-coverage report
-coverage html  # HTML 리포트 생성
-```
+### 6.2 안정성 및 보안 (Security & Resilience)
+* **보안 강화**: SMTP App Password 규격을 강제하며 `.env`를 통해 민감 정보를 격리하여 소스 코드 유출 시에도 안전하게 보호합니다.
+* **무중단 시스템(Fault Tolerance)**: 네트워크 타임아웃, 커넥션 에러, JSON 파싱 오류나 SMTP 인증 실패 등 외부 요인에 의한 에러 발생 시 시스템이 멈추지 않습니다. 상세 에러 로그만 기록한 뒤 다음 스케줄을 안정적으로 대기합니다.
+* **투명한 로깅 시스템**: `ai_news_mailing.log` 파일에 작업 시작 및 완료 시간, 뉴스 수집 결과, 에러 스택 트레이스 등 모든 운영 과정이 투명하게 기록되어 손쉬운 디버깅을 제공합니다.
 
 ---
 
-## 문제 해결
-
-### 1. 이메일 발송 실패
-
-**오류**: `SMTP authentication failed`
-
-**해결방법:**
-- SENDER_EMAIL과 SENDER_PASSWORD 확인
-- Gmail 사용 시 "App Password" (16자 비밀번호) 사용 필수
-- 2단계 인증 활성화 필요
-
-### 2. 뉴스 수집 실패
-
-**오류**: `Failed to fetch feed`
-
-**해결방법:**
-- 인터넷 연결 확인
-- RSS 피드 URL 유효성 확인
-- 로그 파일에서 상세 에러 메시지 확인
-
-### 3. 번역 실패
-
-**오류**: `Translation service connection error`
-
-**해결방법:**
-- 인터넷 연결 확인
-- Google Translate API 접근성 확인
-- 로그에서 상세 에러 메시지 확인
-
-### 4. 로그 파일이 없음
-
-파일이 자동 생성되지 않으면 다음 확인:
-```bash
-# 쓰기 권한 확인
-ls -la pythonMailing/
-
-# 필요시 권한 변경
-chmod 755 pythonMailing/
-```
-
----
-
-## 의존성 패키지 상세
-
-| 패키지            | 버전      | 용도                   |
-| ----------------- | --------- | ---------------------- |
-| feedparser        | 최신      | RSS 피드 파싱          |
-| python-dotenv     | 최신      | 환경 변수 관리         |
-| schedule          | 최신      | 작업 스케줄링          |
-| beautifulsoup4    | 최신      | HTML 파싱              |
-| googletrans       | 4.0.0-rc1 | 자동 번역              |
-| requests          | 최신      | HTTP 요청              |
-| newspaper3k       | 최신      | 기사 콘텐츠 추출       |
-| googlenewsdecoder | 최신      | Google News URL 디코딩 |
-| lxml_html_clean   | 최신      | HTML 정제              |
-
----
-
-## 버전 정보
-
-- **버전**: 2.0.0 (개선 완료)
-- **마지막 업데이트**: 2026-02-27
-- **주요 변경사항**: 
-  - Logging 통합
-  - Error Handling 강화
-  - Configuration Validation 추가
-  - Unit Tests 추가
+> **🔖 버전 정보 (Version Info)**  
+> **버전**: 2.1.0  
+> **마지막 업데이트**: 2026-03-31
